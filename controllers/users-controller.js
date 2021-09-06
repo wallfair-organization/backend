@@ -1,54 +1,54 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 // Import and configure dotenv to enable use of environmental variable
-const dotenv = require("dotenv");
+const dotenv = require('dotenv');
+
 dotenv.config();
 
 // Imports from express validator to validate user input
-const { validationResult } = require("express-validator");
+const { validationResult } = require('express-validator');
 
 // Import Auth Service
-const authService = require("../services/auth-service");
-
-// Import User Service
-const userService = require("../services/user-service");
-
-// Import Event Service
-const eventService = require("../services/event-service");
-
-// Import Mail Service
-const mailService = require("../services/mail-service");
-
-// Import User and Bet Models
-const { User, Bet } = require("@wallfair.io/wallfair-commons").models;
-
-const { ErrorHandler } = require("../util/error-handler");
-
-const bigDecimal = require("js-big-decimal");
-
+const bigDecimal = require('js-big-decimal');
 const {
   BetContract,
   Erc20,
   Wallet,
-} = require("@wallfair.io/smart_contract_mock");
-const WFAIR = new Erc20("WFAIR");
+} = require('@wallfair.io/smart_contract_mock');
+const { User, Bet } = require('@wallfair.io/wallfair-commons').models;
+const authService = require('../services/auth-service');
+
+// Import User Service
+const userService = require('../services/user-service');
+
+// Import Event Service
+const eventService = require('../services/event-service');
+
+// Import Mail Service
+const mailService = require('../services/mail-service');
+
+// Import User and Bet Models
+
+const { ErrorHandler } = require('../util/error-handler');
+
+const WFAIR = new Erc20('WFAIR');
 
 // Controller to sign up a new user
 const login = async (req, res, next) => {
   // Validating User Inputs
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return next(new ErrorHandler(422, "Invalid phone number"));
+    return next(new ErrorHandler(422, 'Invalid phone number'));
   }
 
   // Defining User Inputs
   const { phone, ref } = req.body;
 
   try {
-    let response = await authService.doLogin(phone, ref);
+    const response = await authService.doLogin(phone, ref);
     res
       .status(201)
       .json({
-        phone: phone,
+        phone,
         smsStatus: response.status,
         existing: !!response.existing,
       });
@@ -62,14 +62,14 @@ const verfiySms = async (req, res, next) => {
   // Validating User Inputs
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return next(new ErrorHandler(422, "Invalid verification code"));
+    return next(new ErrorHandler(422, 'Invalid verification code'));
   }
 
   // Defining User Inputs
   const { phone, smsToken } = req.body;
 
   try {
-    let user = await authService.verifyLogin(phone, smsToken);
+    const user = await authService.verifyLogin(phone, smsToken);
 
     res.status(201).json({
       userId: user.id,
@@ -86,7 +86,7 @@ const verfiySms = async (req, res, next) => {
 };
 
 const bindWalletAddress = async (req, res, next) => {
-  console.log("Binding wallet address", req.body);
+  console.log('Binding wallet address', req.body);
 
   // retrieve wallet address
   const { walletAddress } = req.body;
@@ -94,23 +94,23 @@ const bindWalletAddress = async (req, res, next) => {
   // ensure address is present
   if (!walletAddress) {
     return next(
-      res.status(422).send("Property 'walletAddress' expected but was missing")
+      res.status(422).send("Property 'walletAddress' expected but was missing"),
     );
   }
 
   try {
-    //retrieve user who made the request
+    // retrieve user who made the request
     let user = await userService.getUserById(req.user.id);
 
     // check if there is already a user with this wallet
-    let walletUser = await User.findOne({ walletAddress });
+    const walletUser = await User.findOne({ walletAddress });
 
     // if this address was already bound to another user, return 409 error
     if (walletUser && walletUser.id != user.id) {
       return next(
-        res.status(409).send("This wallet is already bound to another user")
+        res.status(409).send('This wallet is already bound to another user'),
       );
-    } else if (!walletUser) {
+    } if (!walletUser) {
       user.walletAddress = walletAddress;
       user = await userService.saveUser(user);
     } else {
@@ -123,7 +123,7 @@ const bindWalletAddress = async (req, res, next) => {
     });
   } catch (err) {
     console.log(err);
-    let error = res.status(422).send(err.message);
+    const error = res.status(422).send(err.message);
     next(error);
   }
 };
@@ -142,25 +142,25 @@ const saveAdditionalInformation = async (req, res, next) => {
     let user = await userService.getUserById(req.user.id);
 
     if (username) {
-      let usernameUser = await User.findOne({ username: username });
+      const usernameUser = await User.findOne({ username });
 
       if (usernameUser !== null && !usernameUser._id.equals(user._id)) {
-        return next(new ErrorHandler(409, "Username is already used"));
+        return next(new ErrorHandler(409, 'Username is already used'));
       }
 
-      user.username = username.replace(" ", "");
+      user.username = username.replace(' ', '');
       user.name = name;
       user = await userService.saveUser(user);
     }
 
     if (email) {
-      let emailUser = await User.findOne({ email: email });
+      const emailUser = await User.findOne({ email });
 
       if (emailUser !== null && !emailUser._id.equals(user._id)) {
-        return next(new ErrorHandler(409, "Email address is already used"));
+        return next(new ErrorHandler(409, 'Email address is already used'));
       }
-      
-      user.email = email.replace(" ", "");
+
+      user.email = email.replace(' ', '');
 
       await rewardRefUserIfNotConfirmed(user);
       user = await userService.saveUser(user);
@@ -182,7 +182,7 @@ const saveAcceptConditions = async (req, res, next) => {
   // Validating User Inputs
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return next(res.status(422).send("All conditions need to be accepted!"));
+    return next(res.status(422).send('All conditions need to be accepted!'));
   }
 
   try {
@@ -197,7 +197,7 @@ const saveAcceptConditions = async (req, res, next) => {
       confirmed: user.confirmed,
     });
   } catch (err) {
-    let error = res.status(422).send(err.message);
+    const error = res.status(422).send(err.message);
     next(error);
   }
 };
@@ -217,17 +217,17 @@ const rewardRefUserIfNotConfirmed = async (user) => {
 
 // Receive all users in leaderboard
 const getLeaderboard = async (req, res, next) => {
-  let limit = parseInt(req.params.limit);
-  let skip = parseInt(req.params.skip);
+  const limit = parseInt(req.params.limit);
+  const skip = parseInt(req.params.skip);
 
-  let users = await User.find({ username: { $exists: true } })
+  const users = await User.find({ username: { $exists: true } })
     .select({ username: 1, amountWon: 1 })
     .sort({ amountWon: -1 })
     .limit(limit)
     .skip(skip)
     .exec();
 
-  let total = await User.countDocuments().exec();
+  const total = await User.countDocuments().exec();
 
   res.json({
     total,
@@ -246,8 +246,8 @@ const getUsers = async (req, res, next) => {
     users = await User.find({}, { name: 1, username: 1 });
   } catch (err) {
     const error = new Error(
-      "Fetching users failed, please try again later.",
-      500
+      'Fetching users failed, please try again later.',
+      500,
     );
     return next(error);
   }
@@ -265,13 +265,11 @@ const getUsers = async (req, res, next) => {
     });
   }
 
-  usersWithBalance.sort(function (a, b) {
-    return b.balance - a.balance;
-  });
+  usersWithBalance.sort((a, b) => b.balance - a.balance);
 
   let counter = 1;
   for (const user of usersWithBalance) {
-    user["index"] = counter;
+    user.index = counter;
     counter += 1;
   }
 
@@ -283,9 +281,9 @@ const getUserInfo = async (req, res) => {
   try {
     const user = await User.findById(req.params.userId);
     const balance = await WFAIR.balanceOf(req.params.userId);
-    const formattedBalance = new bigDecimal(balance).getPrettyValue(4, ".");
-    let { rank, toNextRank } = await userService.getRankByUserId(
-      req.params.userId
+    const formattedBalance = new bigDecimal(balance).getPrettyValue(4, '.');
+    const { rank, toNextRank } = await userService.getRankByUserId(
+      req.params.userId,
     );
     res.status(200).json({
       userId: user.id,
@@ -305,7 +303,7 @@ const getUserInfo = async (req, res) => {
     res
       .status(400)
       .send(
-        "Es ist ein Fehler beim laden deiner Account Informationen aufgetreten"
+        'Es ist ein Fehler beim laden deiner Account Informationen aufgetreten',
       );
   }
 };
@@ -316,48 +314,48 @@ const getRefList = async (req, res) => {
     const refList = await userService.getRefByUserId(req.user.id);
     res.status(200).json({
       userId: req.user.id,
-      refList: refList,
+      refList,
     });
   } catch (err) {
     res
       .status(400)
       .send(
-        "Es ist ein Fehler beim laden deiner Account Informationen aufgetreten"
+        'Es ist ein Fehler beim laden deiner Account Informationen aufgetreten',
       );
   }
 };
 
 const getClosedBetsList = async (request, response) => {
-  const user = request.user;
+  const { user } = request;
 
   try {
     if (user) {
       const userId = request.user.id;
       const user = await userService.getUserById(userId);
 
-      const closedBets = user.closedBets;
+      const { closedBets } = user;
       response.status(200).json({
         closedBets,
       });
     } else {
-      response.status(404).send("User not found");
+      response.status(404).send('User not found');
     }
   } catch (error) {
     console.error(error);
     response
       .status(500)
-      .send("An error occured loading closed bets list: " + error.message);
+      .send(`An error occured loading closed bets list: ${error.message}`);
   }
 };
 
 const getOpenBetsList = async (request, response) => {
-  const user = request.user;
+  const { user } = request;
 
   try {
     if (user) {
       const userId = user.id;
       const openBetIds = user.openBets.filter(
-        (value, index, self) => self.indexOf(value) === index
+        (value, index, self) => self.indexOf(value) === index,
       );
       const openBets = [];
 
@@ -365,10 +363,10 @@ const getOpenBetsList = async (request, response) => {
         const wallet = new Wallet(userId);
         const betEvent = await Bet.findById(openBetId);
 
-        //TODO For the payout function, the bet may have to be displayed as an open bet!
+        // TODO For the payout function, the bet may have to be displayed as an open bet!
         if (
-          betEvent.finalOutcome !== undefined &&
-          betEvent.finalOutcome.length > 0
+          betEvent.finalOutcome !== undefined
+          && betEvent.finalOutcome.length > 0
         ) {
           continue;
         }
@@ -378,7 +376,7 @@ const getOpenBetsList = async (request, response) => {
         for (const outcome of betEvent.outcomes) {
           const investment = await wallet.investmentBet(
             openBetId,
-            outcome.index
+            outcome.index,
           );
           const balance = await bet
             .getOutcomeToken(outcome.index)
@@ -392,10 +390,10 @@ const getOpenBetsList = async (request, response) => {
             betId: openBetId,
             outcome: outcome.index,
             investmentAmount: new bigDecimal(investment).getPrettyValue(
-              "4",
-              "."
+              '4',
+              '.',
             ),
-            outcomeAmount: new bigDecimal(balance).getPrettyValue("4", "."),
+            outcomeAmount: new bigDecimal(balance).getPrettyValue('4', '.'),
           };
 
           openBets.push(openBet);
@@ -406,18 +404,18 @@ const getOpenBetsList = async (request, response) => {
         openBets,
       });
     } else {
-      response.status(404).send("User not found");
+      response.status(404).send('User not found');
     }
   } catch (error) {
     console.error(error);
     response
       .status(500)
-      .send("An error occured loading open bets list: " + error.message);
+      .send(`An error occured loading open bets list: ${error.message}`);
   }
 };
 
 const getTransactions = async (request, response) => {
-  const user = request.user;
+  const { user } = request;
 
   try {
     if (user) {
@@ -427,18 +425,18 @@ const getTransactions = async (request, response) => {
 
       response.status(200).json(trx);
     } else {
-      response.status(404).send("User not found");
+      response.status(404).send('User not found');
     }
   } catch (error) {
     console.error(error);
     response
       .status(500)
-      .send("An error occured loading open bets list: " + error.message);
+      .send(`An error occured loading open bets list: ${error.message}`);
   }
 };
 
 const getAMMHistory = async (request, response) => {
-  const user = request.user;
+  const { user } = request;
 
   try {
     if (user) {
@@ -449,14 +447,14 @@ const getAMMHistory = async (request, response) => {
 
       for (const interaction of interactions) {
         const investmentAmount = new bigDecimal(
-          BigInt(interaction.investmentamount) / WFAIR.ONE
-        ).getPrettyValue("4", ".");
+          BigInt(interaction.investmentamount) / WFAIR.ONE,
+        ).getPrettyValue('4', '.');
         const feeAmount = new bigDecimal(
-          BigInt(interaction.feeamount) / WFAIR.ONE
-        ).getPrettyValue("4", ".");
+          BigInt(interaction.feeamount) / WFAIR.ONE,
+        ).getPrettyValue('4', '.');
         const outcomeTokensBought = new bigDecimal(
-          BigInt(interaction.outcometokensbought) / WFAIR.ONE
-        ).getPrettyValue("4", ".");
+          BigInt(interaction.outcometokensbought) / WFAIR.ONE,
+        ).getPrettyValue('4', '.');
 
         transactions.push({
           ...interaction,
@@ -468,13 +466,13 @@ const getAMMHistory = async (request, response) => {
 
       response.status(200).json(transactions);
     } else {
-      response.status(404).send("User not found");
+      response.status(404).send('User not found');
     }
   } catch (error) {
     console.error(error);
     response
       .status(500)
-      .send("An error occured loading open bets list: " + error.message);
+      .send(`An error occured loading open bets list: ${error.message}`);
   }
 };
 
@@ -495,22 +493,22 @@ const confirmEmail = async (req, res, next) => {
       res
         .status(403)
         .send({
-          error: "EMAIL_ALREADY_CONFIRMED",
-          message: "The email has already been confirmed!",
-        })
+          error: 'EMAIL_ALREADY_CONFIRMED',
+          message: 'The email has already been confirmed!',
+        }),
     );
   }
 
   if (user.emailCode === code) {
     user.emailConfirmed = true;
     await user.save();
-    res.status(200).send({ status: "OK" });
+    res.status(200).send({ status: 'OK' });
   } else {
     res
       .status(403)
       .send({
-        error: "INVALID_EMAIL_CODE",
-        message: "The email code is invalid!",
+        error: 'INVALID_EMAIL_CODE',
+        message: 'The email code is invalid!',
       });
   }
 };
@@ -522,18 +520,18 @@ const resendConfirmEmail = async (req, res) => {
 
   await mailService.sendConfirmMail(user);
 
-  res.status(200).send({ status: "OK" });
+  res.status(200).send({ status: 'OK' });
 };
 
 const updateUser = async (request, response) => {
   if (
-    request.user.admin === false &&
-    request.params.userId !== request.user.id
+    request.user.admin === false
+    && request.params.userId !== request.user.id
   ) {
-    response.status(403).send({ status: "Forbidden" });
+    response.status(403).send({ status: 'Forbidden' });
   } else {
     await userService.updateUser(request.params.userId, request.body);
-    response.status(200).send({ status: "OK" });
+    response.status(200).send({ status: 'OK' });
   }
 };
 
