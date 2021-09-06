@@ -59,4 +59,12 @@ router.get(
     eventController.getTags
 )
 
+router.get( "/health-check",(_,res)=>{
+    res
+    .status(200)
+    .json({
+        timestamp: Date.now()
+    })
+} )
+
 module.exports = router;
