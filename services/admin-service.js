@@ -3,8 +3,6 @@ const { BetContract, Erc20 } = require("@wallfair.io/smart_contract_mock");
 // Import User, Bet and Event models
 const { User, Bet, Event, CategoryBetTemplate } = require("@wallfair.io/wallfair-commons").models;
 
-const { getSlug } = require("./slug-service");
-
 const WFAIR = new Erc20('WFAIR');
 
 // Import services
