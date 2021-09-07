@@ -3,7 +3,7 @@ const { BetContract, Erc20 } = require("@wallfair.io/smart_contract_mock");
 // Import User, Bet and Event models
 const { User, Bet, Event } = require("@wallfair.io/wallfair-commons").models;
 
-const generateSlug = require("../util/generateSlug");
+const { getSlug } = require("./slug-service");
 
 const WFAIR = new Erc20('WFAIR');
 
@@ -13,6 +13,7 @@ const eventService = require("../services/event-service");
 const betService = require("../services/bet-service");
 const websocketService = require("../services/websocket-service");
 const twitchService = require("../services/twitch-service");
+const slugService = require("../services/slug-service");
 
 const generator = require("generate-password");
 
@@ -30,6 +31,19 @@ let mongoose = null;
 exports.setMongoose = (newMongoose) => (mongoose = newMongoose);
 
 let adminBro = null;
+
+const doGetSlugAction = async (request, response, context) => {
+    const { tempSlug } = request.payload;
+    const record = context.record;
+    
+    const slug = await slugService.getSlug(tempSlug, Event);
+
+    record.params.slug = slug;
+    
+    return {
+        record: record.toJSON(),
+    };
+};
 
 exports.initialize = function () {
     adminBro = new AdminBro({
@@ -280,6 +294,11 @@ exports.initialize = function () {
                                 };
                             },
                         },
+                        "do-get-slug": {
+                            actionType: "record",
+                            isVisible: false,
+                            handler: doGetSlugAction,
+                        },
                     },
                 },
             },
@@ -371,7 +390,7 @@ exports.initialize = function () {
                                 let dbEvent = await eventService.getEvent(record.params._id);
                                 const bet = event.betTemplate;
 
-                                const slug = generateSlug(bet.marketQuestion);
+                                const slug = getSlug(bet.marketQuestion, Bet);
 
                                 let createBet = new Bet({
                                     marketQuestion: bet.marketQuestion,
@@ -409,6 +428,11 @@ exports.initialize = function () {
                                 };
                             },
                             component: AdminBro.bundle("./components/new-bet"),
+                        },
+                        "do-get-slug": {
+                            actionType: "record",
+                            isVisible: false,
+                            handler: doGetSlugAction,
                         },
                     },
                 },

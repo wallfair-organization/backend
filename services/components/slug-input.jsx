@@ -1,9 +1,12 @@
 import React, {useState, useEffect, useCallback} from "react";
 import { Box, Label, Input } from "@admin-bro/design-system";
 import generateSlug from "../../util/generateSlug";
+import { ApiClient } from 'admin-bro';
+import * as qs from "qs";
 
 const SlugInput = (props) => {
-    const { record, property } = props;
+    const { record, property, resource } = props;
+    const api = new ApiClient();
 
     // referenceField is the field which value is copied from in order to generate the slug
     const referenceField = property.props?.referenceField;
@@ -13,21 +16,34 @@ const SlugInput = (props) => {
 
     const [populated, setPopulated] = useState(true);
     const [slug, setSlug] = useState(record.params[property.path]);
+    const [initialSlug] = useState(record.params[property.path]);
 
     const setSlugRecordParam = (value) => {
         // Update slug value on Record params, so it's passed to the request body when the form is saved
         record.params[property.path] = value;
     }
 
+    const callAction = async (record, tempSlug) => {
+        return await api.recordAction({ recordId: record.id, actionName: 'do-get-slug', resourceId: resource.id, data: qs.stringify({tempSlug}) });
+    }
+
+    const populateSlugField = async (inputData) => {
+        const { data } = await callAction(record, inputData);
+        const newSlug = data.record.params.slug;
+
+        setSlug(newSlug);
+        setSlugRecordParam(newSlug);
+    }
+
     useEffect(() => {
         // It should start listening for inheritedField's content changes just after being populated by the current "Slug" value in the DB
         if (!populated) {
-            const newSlug = generateSlug(record.params[referenceField]);
-            setSlug(newSlug);
-            setSlugRecordParam(newSlug);
+            populateSlugField(record.params[referenceField]);
         } else {
             setPopulated(false);
         }
+
+
     }, [record.params[referenceField]]);
 
     const handleChange = useCallback((event) => {
@@ -38,13 +54,12 @@ const SlugInput = (props) => {
         event.preventDefault();
     });
 
-    const handleLostFocus = useCallback((event) => {
-        // TODO - add api call to check if Slug already exists
-        const newSlug = generateSlug(event.target.value);
-        setSlug(newSlug);
-        setSlugRecordParam(newSlug);
-
-        event.preventDefault();
+    const handleLostFocus = useCallback(async (event) => {
+        if (initialSlug === event.target.value) {
+            return;
+        }
+        const tempSlug = generateSlug(event.target.value);
+        populateSlugField(tempSlug);
     });
 
     return (
