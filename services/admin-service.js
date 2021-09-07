@@ -3,7 +3,7 @@ const { BetContract, Erc20 } = require("@wallfair.io/smart_contract_mock");
 // Import User, Bet and Event models
 const { User, Bet, Event, CategoryBetTemplate } = require("@wallfair.io/wallfair-commons").models;
 
-const generateSlug = require("../util/generateSlug");
+const { getSlug } = require("./slug-service");
 
 const WFAIR = new Erc20('WFAIR');
 
@@ -13,6 +13,7 @@ const eventService = require("../services/event-service");
 const betService = require("../services/bet-service");
 const websocketService = require("../services/websocket-service");
 const twitchService = require("../services/twitch-service");
+const slugService = require("../services/slug-service");
 
 const generator = require("generate-password");
 
@@ -30,6 +31,19 @@ let mongoose = null;
 exports.setMongoose = (newMongoose) => (mongoose = newMongoose);
 
 let adminBro = null;
+
+const doGetSlugAction = async (request, response, context) => {
+    const { tempSlug } = request.payload;
+    const record = context.record;
+
+    const slug = await slugService.getSlug(tempSlug, Event);
+
+    record.params.slug = slug;
+
+    return {
+        record: record.toJSON(),
+    };
+};
 
 exports.initialize = function () {
     adminBro = new AdminBro({
@@ -127,7 +141,7 @@ exports.initialize = function () {
                                     return {
                                         record: context.record.toJSON(),
                                     };
-                                    
+
                                 } finally {
                                     await session.endSession();
                                 }
@@ -291,6 +305,11 @@ exports.initialize = function () {
                                 };
                             },
                         },
+                        "do-get-slug": {
+                            actionType: "record",
+                            isVisible: false,
+                            handler: doGetSlugAction,
+                        },
                     },
                 },
             },
@@ -329,7 +348,7 @@ exports.initialize = function () {
                                     twitch_url = "https://www.twitch.tv/" + twitch_url;
                                 }
                                 let event = await twitchService.getEventFromTwitchUrl(twitch_url);
-                                
+
                                 return {
                                     eventId: event._id.toString()
                                 }
@@ -358,6 +377,11 @@ exports.initialize = function () {
                                     record: context.record.toJSON(),
                                 }
                             }
+                        },
+                        "do-get-slug": {
+                            actionType: "record",
+                            isVisible: false,
+                            handler: doGetSlugAction,
                         },
                     },
                 },
@@ -396,8 +420,8 @@ exports.buildRouter = function () {
                 return username === process.env.ADMIN_USERNAME && password === process.env.ADMIN_PASSWORD;
               },
           cookiePassword: "ueudeiuhihd",
-        }, 
-        null, 
+        },
+        null,
         {
             resave: false,
             saveUninitialized: true,
