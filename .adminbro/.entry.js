@@ -18,7 +18,3 @@ import Component8 from '../services/components/slug-input'
 AdminBro.UserComponents.Component8 = Component8
 import Component9 from '../services/components/twitch-url'
 AdminBro.UserComponents.Component9 = Component9
-import Component10 from '../services/components/new-bet'
-AdminBro.UserComponents.Component10 = Component10
-import Component11 from '../services/components/new-bet'
-AdminBro.UserComponents.Component11 = Component11
