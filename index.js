@@ -14,7 +14,7 @@ const mongoose = require('mongoose');
 // Import Models from Wallfair Commons
 const wallfair = require('@wallfair.io/wallfair-commons');
 const { handleError } = require('./util/error-handler');
-const notificationsController = require("./controllers/notifications-controller");
+
 
 let mongoURL = process.env.DB_CONNECTION;
 if (process.env.ENVIRONMENT === 'STAGING') {
