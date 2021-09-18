@@ -18,6 +18,7 @@ const betService = require('../services/bet-service');
 const { ErrorHandler } = require('../util/error-handler');
 const { toPrettyBigDecimal, toCleanBigDecimal } = require('../util/number-helper');
 const { isAdmin } = require('../helper');
+const websocketService = require("../services/websocket-service");
 
 const WFAIR = new Erc20('WFAIR');
 
@@ -83,6 +84,13 @@ const createBet = async (req, res, next) => {
 
         await eventService.provideLiquidityToBet(createdBet);
       });
+
+      await websocketService
+        .emitBetCreatedByEventId(
+          createdBet.event,
+          req.user.id,
+          createdBet._id,
+          createdBet.title);
 
     } finally {
       await session.endSession();
@@ -167,6 +175,8 @@ const pullOutBet = async (req, res, next) => {
 
     const session = await User.startSession();
     try {
+      let newBalances;
+
       await session
         .withTransaction(async () => {
           console.debug(LOG_TAG, 'Interacting with the AMM');
@@ -177,6 +187,23 @@ const pullOutBet = async (req, res, next) => {
             LOG_TAG,
             `SELL ${userId} ${sellAmount} ${outcome} ${requiredMinReturnAmount * WFAIR.ONE}`
           );
+
+          newBalances = await betContract.sellAmount(
+            userId,
+            sellAmount,
+            outcome,
+            requiredMinReturnAmount * WFAIR.ONE
+          );
+
+          await websocketService.emitPullOutBetToAllByEventId(
+            bet.event,
+            bet._id,
+            user,
+            toPrettyBigDecimal(newBalances?.earnedTokens),
+            outcome,
+            0n
+          );
+
           console.debug(LOG_TAG, 'Successfully sold Tokens');
 
           await tradeService.closeTrades(user.id, bet, outcome, 'sold', session);

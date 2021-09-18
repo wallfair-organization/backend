@@ -3,6 +3,7 @@ const tradeService = require('./trade-service');
 const eventService = require('./event-service');
 const { Bet, Trade } = require('@wallfair.io/wallfair-commons').models;
 const { BetContract, Erc20 } = require('@wallfair.io/smart_contract_mock');
+const websocketService = require("../services/websocket-service");
 const { toPrettyBigDecimal, toCleanBigDecimal } = require('../util/number-helper');
 
 const WFAIR = new Erc20('WFAIR');
@@ -69,6 +70,19 @@ exports.placeBet = async (userId, betId, amount, outcome, minOutcomeTokens) => {
 
       console.debug(LOG_TAG, 'Trade saved successfully');
     });
+
+    if (bet) {
+      const eventId = bet.event;
+      const betId = bet._id;
+
+      await websocketService.emitPlaceBetToAllByEventId(
+        eventId,
+        betId,
+        user,
+        toPrettyBigDecimal(amount),
+        outcome
+      );
+    }
 
     return response;
   } catch (err) {
