@@ -194,22 +194,21 @@ const pullOutBet = async (req, res, next) => {
             outcome,
             requiredMinReturnAmount * WFAIR.ONE
           );
-
-          await websocketService.emitPullOutBetToAllByEventId(
-            bet.event,
-            bet._id,
-            user,
-            toPrettyBigDecimal(newBalances?.earnedTokens),
-            outcome,
-            0n
-          );
-
           console.debug(LOG_TAG, 'Successfully sold Tokens');
 
           await tradeService.closeTrades(user.id, bet, outcome, 'sold', session);
           console.debug(LOG_TAG, 'Trades closed successfully');
         })
         .catch((err) => console.error(err));
+
+        await websocketService.emitPullOutBetToAllByEventId(
+          bet.event,
+          bet._id,
+          user,
+          toPrettyBigDecimal(newBalances?.earnedTokens),
+          outcome,
+          0n
+        );
 
     } catch (err) {
       console.error(err);
