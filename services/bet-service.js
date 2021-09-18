@@ -27,8 +27,6 @@ exports.placeBet = async (userId, betId, amount, outcome, minOutcomeTokens) => {
 
   const bet = await eventService.getBet(betId);
 
-  if(!bet)  throw new Error('Bet not found');
-
   console.debug(LOG_TAG, 'Placing Bet', betId, userId);
 
   if (!eventService.isBetTradable(bet)) {
