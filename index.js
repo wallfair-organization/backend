@@ -1,5 +1,6 @@
 // Import and configure dotenv to enable use of environmental variable
 const dotenv = require('dotenv');
+const notificationsController = require('./controllers/notifications-controller');
 
 dotenv.config();
 
@@ -13,6 +14,7 @@ const mongoose = require('mongoose');
 // Import Models from Wallfair Commons
 const wallfair = require('@wallfair.io/wallfair-commons');
 const { handleError } = require('./util/error-handler');
+const notificationsController = require("./controllers/notifications-controller");
 
 let mongoURL = process.env.DB_CONNECTION;
 if (process.env.ENVIRONMENT === 'STAGING') {
@@ -104,15 +106,7 @@ async function main() {
       userService.increaseAmountWon(messageObj.to, messageObj.data.reward);
     }
 
-    io.of('/').to(messageObj.to).emit(messageObj.event, messageObj.data);
-  });
-
-  const notificationsController = require('./controllers/notifications-controller');
-
-  subClient.subscribe('message');
-  subClient.on('notification', (channel, message) => {
     try {
-      const messageObj = JSON.parse(message);
       if (messageObj.data.type && notificationsController[messageObj.data.type]) {
         notificationsController[messageObj.data.type](messageObj.data);
       } else {
@@ -121,9 +115,11 @@ async function main() {
     } catch (err) {
       console.error(err);
     }
+
+    io.of('/').to(messageObj.to).emit(messageObj.event, messageObj.data);
   });
 
-  subClient.subscribe('notification');
+  subClient.subscribe('message');
 
   websocketService.setIO(io);
 
