@@ -167,8 +167,6 @@ const pullOutBet = async (req, res, next) => {
 
     const session = await User.startSession();
     try {
-      let newBalances;
-
       await session
         .withTransaction(async () => {
           console.debug(LOG_TAG, 'Interacting with the AMM');
@@ -178,13 +176,6 @@ const pullOutBet = async (req, res, next) => {
           console.debug(
             LOG_TAG,
             `SELL ${userId} ${sellAmount} ${outcome} ${requiredMinReturnAmount * WFAIR.ONE}`
-          );
-
-          newBalances = await betContract.sellAmount(
-            userId,
-            sellAmount,
-            outcome,
-            requiredMinReturnAmount * WFAIR.ONE
           );
           console.debug(LOG_TAG, 'Successfully sold Tokens');
 

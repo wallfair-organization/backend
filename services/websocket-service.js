@@ -211,7 +211,3 @@ const emitToAllByUserId = (userId, emitEventName, data) => {
     })
   );
 };
-
-const emitToSystem = (data) => {
-  io.of('/').to('system').emit(data.type, ...data)
-}
