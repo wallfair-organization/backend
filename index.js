@@ -123,7 +123,7 @@ async function main() {
     }
   });
 
-  // subClient.subscribe('notification');
+  subClient.subscribe('notification');
 
   websocketService.setIO(io);
 

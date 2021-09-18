@@ -1,15 +1,23 @@
 const userService = require('../services/user-service');
-const { notificationTypes } = require('../services/websocket-service');
+const eventTypes = require('@wallfair.io/wallfair-commons').constants.events.notification
+const { UniversalEvent } = require('@wallfair.io/wallfair-commons').models;
 
 const notifyNewBet = async (data) => {
+  await UniversalEvent.save({
+    type: eventTypes.EVENT_NEW_BET,
+    data
+  })
+
   const eventId = data.to;
   const users = await userService.getUsersToNotify(eventId, {
     newBetInEvent: true,
   });
+
   console.log(`${data.type}: Send email to multiple users`);
   users.forEach((u) => {
     console.log(u.email);
   });
+
 };
 
 const notifyEventOnline = async (data) => {
@@ -76,11 +84,11 @@ const defaultNotification = async (message) => {
   console.log(`This is a notification sent by a fallthrough method`, message);
 };
 
-exports[notificationTypes.EVENT_RESOLVE] = notifyResolve;
-exports[notificationTypes.EVENT_NEW_BET] = notifyNewBet;
-exports[notificationTypes.EVENT_NEW_REWARD] = notifyNewReward;
-exports[notificationTypes.EVENT_ONLINE] = notifyEventOnline;
-exports[notificationTypes.EVENT_OFFLINE] = notifyEventOffline;
-exports[notificationTypes.EVENT_BET_PLACED] = notifyPlaceBet;
-exports[notificationTypes.EVENT_BET_CASHED_OUT] = notifyCashOutBet;
+exports[eventTypes.EVENT_RESOLVE] = notifyResolve;
+exports[eventTypes.EVENT_NEW_BET] = notifyNewBet;
+exports[eventTypes.EVENT_NEW_REWARD] = notifyNewReward;
+exports[eventTypes.EVENT_ONLINE] = notifyEventOnline;
+exports[eventTypes.EVENT_OFFLINE] = notifyEventOffline;
+exports[eventTypes.EVENT_BET_PLACED] = notifyPlaceBet;
+exports[eventTypes.EVENT_BET_CASHED_OUT] = notifyCashOutBet;
 exports.defaultNotification = defaultNotification;
