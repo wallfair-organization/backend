@@ -4,7 +4,6 @@ const { Bet, Event } = require('@wallfair.io/wallfair-commons').models;
 // Import services
 
 const { BetContract, Erc20 } = require('@wallfair.io/smart_contract_mock');
-const websocketService = require('./websocket-service');
 const { toPrettyBigDecimal } = require('../util/number-helper');
 
 const WFAIR = new Erc20('WFAIR');
@@ -108,52 +107,7 @@ exports.getEvent = async (id) =>
 exports.getBet = async (id, session) =>
   Bet.findOne({ _id: id }).session(session).map(calculateBetStatus);
 
-exports.placeBet = async (user, bet, investmentAmount, outcome) => {
-  if (bet) {
-    const eventId = bet.event;
-    const betId = bet._id;
-
-    await websocketService.emitPlaceBetToAllByEventId(
-      eventId,
-      betId,
-      user,
-      investmentAmount,
-      outcome
-    );
-  }
-};
-
-exports.pullOutBet = async (user, bet, amount, outcome, currentPrice) => {
-  if (bet) {
-    const eventId = bet.event;
-    const betId = bet._id;
-
-    await websocketService.emitPullOutBetToAllByEventId(
-      eventId,
-      betId,
-      user,
-      amount,
-      outcome,
-      currentPrice
-    );
-  }
-};
-
 exports.isBetTradable = (bet) => bet.status === BET_STATUS.active;
-
-/**
- *
- * @param Object bet
- * @param String userId
- */
-exports.betCreated = async (bet, userId) => {
-  if (bet) {
-    const eventId = bet.event;
-    const betId = bet._id;
-
-    await websocketService.emitBetCreatedByEventId(eventId, userId, betId, bet.title);
-  }
-};
 
 exports.provideLiquidityToBet = async (createBet) => {
   const LOG_TAG = '[CREATE-BET]';

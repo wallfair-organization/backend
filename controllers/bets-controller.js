@@ -84,7 +84,6 @@ const createBet = async (req, res, next) => {
         await eventService.provideLiquidityToBet(createdBet);
       });
 
-      await eventService.betCreated(createdBet, req.user.id);
     } finally {
       await session.endSession();
     }
@@ -194,13 +193,6 @@ const pullOutBet = async (req, res, next) => {
         })
         .catch((err) => console.error(err));
 
-      await eventService.pullOutBet(
-        user,
-        bet,
-        toPrettyBigDecimal(newBalances?.earnedTokens),
-        outcome,
-        0n
-      );
     } catch (err) {
       console.error(err);
     } finally {
