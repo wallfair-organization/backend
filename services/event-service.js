@@ -229,10 +229,8 @@ function getPadValue(data, startIndex) {
     }
   }
 
-  // hack to make some values in sparse array
-  const base = startIndex / 400;
-  const variance = Math.random() * 0.05;
-  return base + variance;
+  // should never come here because we set the first value
+  return 0;
 }
 
 function padData(response) {
@@ -240,7 +238,7 @@ function padData(response) {
     ...entry,
     data: entry.data.map((d, idx) => ({
       ...d,
-      y: d.y ?? getPadValue(entry.data.slice(1), idx),
+      y: d.y ?? getPadValue(entry.data, idx),
     }))
   }));
 }
