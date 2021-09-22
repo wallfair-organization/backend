@@ -6,6 +6,7 @@ dotenv.config();
 // Import express
 const express = require('express');
 const http = require('http');
+const bodyParser = require('body-parser');
 
 // Import mongoose to connect to Database
 const mongoose = require('mongoose');
