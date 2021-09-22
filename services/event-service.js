@@ -5,7 +5,6 @@ const { Bet, Event } = require('@wallfair.io/wallfair-commons').models;
 
 const { BetContract, Erc20 } = require('@wallfair.io/smart_contract_mock');
 const websocketService = require('./websocket-service');
-const { toPrettyBigDecimal } = require('../util/number-helper');
 const { publishEvent, notificationEvents } = require('./notification-service');
 
 const WFAIR = new Erc20('WFAIR');
