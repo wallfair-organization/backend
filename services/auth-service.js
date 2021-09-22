@@ -6,6 +6,7 @@ const { User } = require('@wallfair.io/wallfair-commons').models;
 
 // Import User Service
 const userService = require('./user-service');
+const { publishEvent, notificationEvents } = require('./notification-service');
 
 // Import twilio client
 const twilio = require('twilio')(process.env.TWILIO_ACC_SID, process.env.TWILIO_AUTH_TOKEN);
@@ -32,6 +33,13 @@ exports.doLogin = async (phone, ref) => {
           createdUser = await userService.getUserByPhone(phone, session);
           console.debug(`createdUser ${createdUser.id}`);
           await userService.mintUser(createdUser.id.toString());
+        });
+
+        // TODO: Move to new function after impl for user/password is ready
+        publishEvent(notificationEvents.EVENT_USER_SIGNED_UP, {
+          producer: 'user',
+          producerId: createdUser._id,
+          data: { phone, ref },
         });
       } finally {
         await session.endSession();
@@ -66,8 +74,14 @@ exports.verifyLogin = async (phone, smsToken) => {
     throw new Error('Invalid verification code', 401);
   }
 
+  // TODO: Move to new function after impl for user/password is ready
+  publishEvent(notificationEvents.EVENT_USER_SIGNED_IN, {
+    producer: 'user',
+    producerId: user._id,
+    data: { phone },
+  });
+
   return user;
 };
 
-exports.generateJwt = async (user) =>
-  jwt.sign({ userId: user.id, phone: user.phone }, process.env.JWT_KEY);
+exports.generateJwt = async (user) => jwt.sign({ userId: user.id, phone: user.phone }, process.env.JWT_KEY);

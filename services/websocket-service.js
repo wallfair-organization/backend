@@ -10,7 +10,6 @@ const persist = async (data) => {
   }
 };
 
-exports.setIO = (newIo) => (io = newIo);
 exports.setPubClient = (newpub) => (pubClient = newpub);
 
 exports.handleChatMessage = async function (socket, data, userId) {
@@ -151,15 +150,7 @@ const notificationTypes = {
   EVENT_START: 'Notification/EVENT_START',
   EVENT_RESOLVE: 'Notification/EVENT_RESOLVE',
   EVENT_CANCEL: 'Notification/EVENT_CANCEL',
-  EVENT_NEW_BET: 'Notification/EVENT_NEW_BET',
-  EVENT_ONLINE: 'Notification/EVENT_ONLINE',
-  EVENT_OFFLINE: 'Notification/EVENT_OFFLINE',
-  EVENT_NEW_REWARD: 'Notification/EVENT_NEW_REWARD',
-  EVENT_BET_PLACED: 'Notification/EVENT_BET_PLACED',
-  EVENT_BET_CASHED_OUT: 'Notification/EVENT_BET_CASHED_OUT',
 };
-
-exports.notificationTypes = notificationTypes;
 
 const emitEventStartNotification = (userId, eventId, eventName) => {
   console.log(userId, eventId, eventName);
@@ -201,16 +192,6 @@ const emitEventCancelNotification = (userId, eventId, eventName, cancellationDes
   // emitToAllByUserId(userId, 'notification', { type: notificationTypes.EVENT_CANCEL, eventId, message });
 };
 exports.emitEventCancelNotification = emitEventCancelNotification;
-
-const emitEventOnline = (event) => {
-  emitToAllByEventId(event.id, notificationTypes.EVENT_ONLINE, event);
-};
-exports.emitEventOnline = emitEventOnline;
-
-const emitEventOffline = (event) => {
-  emitToAllByEventId(event.id, notificationTypes.EVENT_OFFLINE, event);
-};
-exports.emitEventOffline = emitEventOffline;
 
 const emitToAllByUserId = (userId, emitEventName, data) => {
   console.debug(LOG_TAG, `emitting event "${emitEventName}" to all in user room ${userId}`);

@@ -1,5 +1,6 @@
 // Import and configure dotenv to enable use of environmental variable
 const dotenv = require('dotenv');
+
 dotenv.config();
 
 // Imports from express validator to validate user input
@@ -36,7 +37,9 @@ const listEvents = async (req, res, next) => {
 };
 
 const filterEvents = async (req, res) => {
-  const { category, sortby, searchQuery, type } = req.params;
+  const {
+    category, sortby, searchQuery, type,
+  } = req.params;
   const count = +req.params.count;
   const page = +req.params.page;
 
@@ -46,7 +49,7 @@ const filterEvents = async (req, res) => {
     count,
     page,
     sortby,
-    searchQuery
+    searchQuery,
   );
 
   res.status(201).json(eventList);
@@ -74,7 +77,7 @@ const getEvent = async (req, res, next) => {
 };
 
 const createEvent = async (req, res, next) => {
-  if (!isAdmin(req)) return next(new ErrorHandler(403, 'Action not allowed')); 
+  if (!isAdmin(req)) return next(new ErrorHandler(403, 'Action not allowed'));
 
   // Validating User Inputs
   const LOG_TAG = '[CREATE-EVENT]';
@@ -86,7 +89,9 @@ const createEvent = async (req, res, next) => {
 
   try {
     // Defining User Inputs
-    const { name, slug, streamUrl, previewImageUrl, category, tags = [], date, type } = req.body;
+    const {
+      name, slug, streamUrl, previewImageUrl, category, tags = [], date, type,
+    } = req.body;
 
     console.debug(LOG_TAG, 'Create a new Event', {
       name,
@@ -122,8 +127,6 @@ const createEvent = async (req, res, next) => {
 const createEventFromYoutube = async (req, res, next) => {
   if (!isAdmin(req)) return next(new ErrorHandler(403, 'Action not allowed'));
 
-  // const LOG_TAG = '[CREATE-EVENT]';
-
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -135,9 +138,9 @@ const createEventFromYoutube = async (req, res, next) => {
     // TODO properly parse URL
     let streamUrl = req.body.youtubeVideoId;
 
-    if (streamUrl.indexOf("/") == -1) {
+    if (streamUrl.indexOf('/') == -1) {
       streamUrl = `https://www.youtube.com/watch?v=${req.body.youtubeVideoId}`;
-    } 
+    }
 
     let event = await youtubeService.getEventFromYoutubeUrl(streamUrl, req.body.category);
 

@@ -2,9 +2,11 @@ const nodemailer = require('nodemailer');
 const smtpTransport = require('nodemailer-smtp-transport');
 
 const fs = require('fs');
+const { publishEvent, notificationEvents } = require('./notification-service');
 
 const email_confirm = fs.readFileSync('./emails/email-confirm.html', 'utf8');
 const email_evaluate = fs.readFileSync('./emails/email-evaluate.html', 'utf8');
+const resetPasswordEmailTemplate = fs.readFileSync('./emails/reset-password-email.html', 'utf8');
 
 const transporter = nodemailer.createTransport(
   smtpTransport({
@@ -20,6 +22,10 @@ const transporter = nodemailer.createTransport(
 exports.sendConfirmMail = async (user) => {
   const emailCode = this.generate(6);
   const queryString = `?userId=${user.id}&code=${emailCode}`;
+  /**
+   * TODO
+   * When using v2 route please don't forget to pass `email` to the new route as POST param.
+   */
   const generatedTemplate = email_confirm
     .replace('{{query_string}}', queryString)
     .replace('{{verify_url}}', process.env.VERIFY_URL);
@@ -29,6 +35,15 @@ exports.sendConfirmMail = async (user) => {
   user.emailCode = emailCode;
   await user.save();
 };
+
+exports.sendResetPasswordMail = async (user) => {
+  // TODO @gmussi Please define baseUrl. Who's building the express route?
+  const baseUrl = ''
+  const queryString= `${baseUrl}?email=${user.email}`
+  const generatedTemplate = resetPasswordEmailTemplate
+    .replace('{{buttonUrl}}', queryString)
+  await this.sendMail(user.email, 'Wallfair: Reset your password', generatedTemplate);
+}
 
 exports.sendEventEvaluateMail = async (payload) => {
   const ratings = {
@@ -44,8 +59,17 @@ exports.sendEventEvaluateMail = async (payload) => {
     .replace('{{bet_question}}', bet_question)
     .replace('{{rating}}', rating)
     .replace('{{comment}}', comment);
-
   await this.sendMail('feedback@wallfair.io', 'Event Evaluate Feedback', generatedTemplate);
+
+  publishEvent(notificationEvents.EVENT_BET_EVALUATED, {
+    producer: 'system',
+    producerId: 'notification-service',
+    data: {
+      bet_question,
+      rating,
+      comment,
+    },
+  });
 };
 
 exports.generate = (n) => {
@@ -53,7 +77,7 @@ exports.generate = (n) => {
   let max = 12 - add;
 
   if (n > max) {
-    return generate(max) + generate(n - max);
+    return this.generate(max) + this.generate(n - max);
   }
 
   max = Math.pow(10, n + add);
