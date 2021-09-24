@@ -104,7 +104,7 @@ const createEvent = async (req, res, next) => {
       isNonStreamedEvent &&
       (!bet ||
         !['slug', 'marketQuestion', 'outcomes', 'endDate', 'evidenceDescription'].reduce(
-          (acc, key) => acc && bet.hasOwnProperty(key),
+          (acc, key) => acc && !!bet[key],
           true
         ))
     ) {
