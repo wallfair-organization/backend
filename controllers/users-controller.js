@@ -12,6 +12,7 @@ const { ErrorHandler } = require('../util/error-handler');
 const { toPrettyBigDecimal, toCleanBigDecimal } = require('../util/number-helper');
 const { WFAIR_REWARDS } = require('../util/constants');
 const { BetContract } = require('@wallfair.io/smart_contract_mock');
+const _ = require('lodash');
 
 const WFAIR = new Erc20('WFAIR');
 
@@ -372,13 +373,16 @@ const getTradeHistory = async (req, res, next) => {
       const bet = trade._id;
 
       if (bet.status === 'sold') {
-        const interaction = interactions.find(
+        const sellInteractions = interactions.filter(
           (i) =>
             i.bet === bet.betId.toString() &&
             i.direction === 'SELL' &&
             i.outcome === bet.outcomeIndex
         );
-        soldAmount = toPrettyBigDecimal(BigInt(interaction?.investmentamount || 0));
+        const totalSellAmount = _.sum(
+          sellInteractions.map(_.property('investmentamount')).map(Number).filter(_.isFinite)
+        );
+        soldAmount = toPrettyBigDecimal(BigInt(totalSellAmount || 0));
       }
 
       return {
