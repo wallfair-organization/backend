@@ -260,7 +260,7 @@ const getOpenBetsList = async (request, response, next) => {
 
   try {
     if (user) {
-      const trades = await tradeService.getActiveTradesByUserId(user.id);
+      const trades = await tradeService.getTradesByUserIdAndStatuses(user.id, ['active']);
 
       const openBets = [];
 
@@ -285,6 +285,7 @@ const getOpenBetsList = async (request, response, next) => {
           lastDate: trade.date,
           currentBuyAmount: toPrettyBigDecimal(outcomeBuy),
           sellAmount: toPrettyBigDecimal(outcomeSell),
+          status: trade._id.status,
         });
       }
 
@@ -347,6 +348,54 @@ const getAMMHistory = async (req, res, next) => {
   } catch (err) {
     console.error(err);
     next(new ErrorHandler(500, err.message));
+  }
+};
+
+const getTradeHistory = async (req, res, next) => {
+  const user = req.user;
+
+  if (!user) {
+    return next(new ErrorHandler(404, 'User not found'));
+  }
+
+  try {
+    const wallet = new Wallet(user.id);
+    const interactions = await wallet.getAMMInteractions();
+    const finalizedTrades = await tradeService.getTradesByUserIdAndStatuses(user.id, [
+      'closed',
+      'rewarded',
+      'sold',
+    ]);
+
+    const trades = finalizedTrades.map((trade) => {
+      let soldAmount;
+      const bet = trade._id;
+
+      if (bet.status === 'sold') {
+        const interaction = interactions.find(
+          (i) =>
+            i.bet === bet.betId.toString() &&
+            i.direction === 'SELL' &&
+            i.outcome === bet.outcomeIndex
+        );
+        soldAmount = toPrettyBigDecimal(BigInt(interaction?.investmentamount || 0));
+      }
+
+      return {
+        ...bet,
+        investmentAmount: trade.totalInvestmentAmount,
+        outcomeAmount: trade.totalOutcomeTokens,
+        lastDate: trade.date,
+        soldAmount,
+      };
+    });
+
+    res.status(200).json({
+      trades,
+    });
+  } catch (e) {
+    console.error(e);
+    next(new ErrorHandler(500, 'Failed to fetch trade history'));
   }
 };
 
@@ -434,6 +483,7 @@ exports.getRefList = getRefList;
 exports.getOpenBetsList = getOpenBetsList;
 exports.getTransactions = getTransactions;
 exports.getAMMHistory = getAMMHistory;
+exports.getTradeHistory = getTradeHistory;
 exports.confirmEmail = confirmEmail;
 exports.resendConfirmEmail = resendConfirmEmail;
 exports.updateUser = updateUser;
