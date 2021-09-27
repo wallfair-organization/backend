@@ -56,6 +56,7 @@ router.post(
     check('slug').isString().notEmpty().isLength({ max: 255 }),
     check('outcomes').isArray({ min: 0 }),
     check('evidenceSource').isLength({ max: 2200 }),
+    check('description').isLength({ max: 2200 }),
     check('evidenceDescription').isLength({ max: 2200 }),
     check('date').notEmpty(),
     check('published').default(true),
