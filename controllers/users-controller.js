@@ -7,7 +7,7 @@ const { User } = require('@wallfair.io/wallfair-commons').models;
 const userService = require('../services/user-service');
 const tradeService = require('../services/trade-service');
 const { ErrorHandler } = require('../util/error-handler');
-const { toPrettyBigDecimal, toCleanBigDecimal } = require('../util/number-helper');
+const { toBigDecimal, toBigInt } = require('../util/number-helper');
 const { WFAIR_REWARDS } = require('../util/constants');
 const { BetContract } = require('@wallfair.io/smart_contract_mock');
 const _ = require('lodash');
@@ -165,7 +165,7 @@ const getUserInfo = async (req, res, next) => {
 
     const user = await User.findById(userId);
     const balance = await WFAIR.balanceOf(userId);
-    const formattedBalance = toPrettyBigDecimal(balance);
+    const formattedBalance = toBigDecimal(balance);
     const { rank, toNextRank } = await userService.getRankByUserId(userId);
 
     res.status(200).json({
@@ -221,11 +221,11 @@ const getOpenBetsList = async (request, response, next) => {
         if (outcomes.length) {
           const betContract = new BetContract(betId, outcomes.length);
           outcomeBuy = await betContract.calcBuy(
-            BigInt(toCleanBigDecimal(parseFloat(trade.totalInvestmentAmount).toFixed(4)).getValue()),
+            toBigInt(trade.totalInvestmentAmount),
             outcomeIndex
           );
           outcomeSell = await betContract.calcSellFromAmount(
-            BigInt(toCleanBigDecimal(parseFloat(trade.totalOutcomeTokens).toFixed(4)).getValue()),
+            toBigInt(trade.totalOutcomeTokens),
             outcomeIndex
           );
         }
@@ -236,8 +236,8 @@ const getOpenBetsList = async (request, response, next) => {
           investmentAmount: trade.totalInvestmentAmount,
           outcomeAmount: trade.totalOutcomeTokens,
           lastDate: trade.date,
-          currentBuyAmount: toPrettyBigDecimal(outcomeBuy),
-          sellAmount: toPrettyBigDecimal(outcomeSell),
+          currentBuyAmount: toBigDecimal(outcomeBuy),
+          sellAmount: toBigDecimal(outcomeSell),
           status: trade._id.status,
         });
       }
@@ -282,9 +282,9 @@ const getAMMHistory = async (req, res, next) => {
       const transactions = [];
 
       for (const interaction of interactions) {
-        const investmentAmount = toPrettyBigDecimal(BigInt(interaction.investmentamount));
-        const feeAmount = toPrettyBigDecimal(BigInt(interaction.feeamount));
-        const outcomeTokensBought = toPrettyBigDecimal(BigInt(interaction.outcometokensbought));
+        const investmentAmount = toBigDecimal(BigInt(interaction.investmentamount));
+        const feeAmount = toBigDecimal(BigInt(interaction.feeamount));
+        const outcomeTokensBought = toBigDecimal(BigInt(interaction.outcometokensbought));
 
         transactions.push({
           ...interaction,
@@ -334,7 +334,7 @@ const getTradeHistory = async (req, res, next) => {
         const totalSellAmount = _.sum(
           sellInteractions.map(_.property('investmentamount')).map(Number).filter(_.isFinite)
         );
-        soldAmount = toPrettyBigDecimal(BigInt(totalSellAmount || 0));
+        soldAmount = toBigDecimal(BigInt(totalSellAmount || 0n));
       }
 
       return {

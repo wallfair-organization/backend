@@ -5,7 +5,7 @@ const websocketService = require('./websocket-service');
 const { Bet, Trade, Event } = require('@wallfair.io/wallfair-commons').models;
 const { publishEvent, notificationEvents } = require('./notification-service');
 const { BetContract, Erc20 } = require('@wallfair.io/smart_contract_mock');
-const { toPrettyBigDecimal, toCleanBigDecimal } = require('../util/number-helper');
+const { toBigInt, toBigDecimal } = require('../util/number-helper');
 const { calculateAllBetsStatus, filterPublishedBets } = require('../services/event-service');
 
 const WFAIR = new Erc20('WFAIR');
@@ -75,13 +75,11 @@ exports.editBet = async (betId, betData) => {
 exports.placeBet = async (userId, betId, amount, outcome, minOutcomeTokens) => {
   const LOG_TAG = '[CREATE-BET]';
 
-  amount = parseFloat(amount).toFixed(4);
-  const bigAmount = toCleanBigDecimal(amount);
-  amount = BigInt(bigAmount.getValue());
+  amount = toBigInt(amount);
 
   let minOutcomeTokensToBuy = 1n;
   if (minOutcomeTokens > 1) {
-    minOutcomeTokensToBuy = BigInt(minOutcomeTokens);
+    minOutcomeTokensToBuy = toBigInt(minOutcomeTokens);
   }
 
   const bet = await eventService.getBet(betId);
@@ -113,18 +111,16 @@ exports.placeBet = async (userId, betId, amount, outcome, minOutcomeTokens) => {
 
       console.debug(LOG_TAG, 'Interacting with the AMM');
 
-      await betContract.buy(userId, amount, outcome, minOutcomeTokensToBuy * WFAIR.ONE);
+      const outcomeResult = await betContract.buy(userId, amount, outcome, minOutcomeTokensToBuy);
 
       console.debug(LOG_TAG, 'Successfully bought Tokens');
-
-      const potentialReward = await betContract.calcBuy(amount, outcome);
 
       const trade = new Trade({
         userId: userId,
         betId: bet._id,
         outcomeIndex: outcome,
-        investmentAmount: toPrettyBigDecimal(amount),
-        outcomeTokens: toPrettyBigDecimal(potentialReward),
+        investmentAmount: toBigDecimal(amount),
+        outcomeTokens: toBigDecimal(outcomeResult.boughtOutcomeTokens),
       });
 
       response.trade = await trade.save({ session });
@@ -132,7 +128,7 @@ exports.placeBet = async (userId, betId, amount, outcome, minOutcomeTokens) => {
       console.debug(LOG_TAG, 'Trade saved successfully');
     });
 
-    await eventService.placeBet(user, bet, toPrettyBigDecimal(amount), outcome);
+    await eventService.placeBet(user, bet, toBigDecimal(amount), outcome);
 
     publishEvent(notificationEvents.EVENT_BET_PLACED, {
       producer: 'user',
@@ -287,8 +283,7 @@ exports.resolve = async ({
   for (const resolvedResult of resolveResults) {
     const userId = resolvedResult.owner;
     const { balance } = resolvedResult;
-
-    const winToken = Math.round(Number(balance) / Number(WFAIR.ONE));
+    const winToken = toBigDecimal(balance);
 
     if (userId.includes('_')) {
       continue;
