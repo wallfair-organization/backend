@@ -4,11 +4,9 @@ const eventService = require('./event-service');
 const websocketService = require('./websocket-service');
 const { Bet, Trade, Event } = require('@wallfair.io/wallfair-commons').models;
 const { publishEvent, notificationEvents } = require('./notification-service');
-const { BetContract, Erc20 } = require('@wallfair.io/smart_contract_mock');
-const { toBigInt, toBigDecimal } = require('../util/number-helper');
+const { BetContract } = require('@wallfair.io/smart_contract_mock');
+const { toScaledBigInt, fromScaledBigInt } = require('../util/number-helper');
 const { calculateAllBetsStatus, filterPublishedBets } = require('../services/event-service');
-
-const WFAIR = new Erc20('WFAIR');
 
 exports.listBets = async (q) => {
   return Bet.find(q).populate('event')
@@ -75,11 +73,11 @@ exports.editBet = async (betId, betData) => {
 exports.placeBet = async (userId, betId, amount, outcome, minOutcomeTokens) => {
   const LOG_TAG = '[CREATE-BET]';
 
-  amount = toBigInt(amount);
+  amount = toScaledBigInt(amount);
 
   let minOutcomeTokensToBuy = 1n;
   if (minOutcomeTokens > 1) {
-    minOutcomeTokensToBuy = toBigInt(minOutcomeTokens);
+    minOutcomeTokensToBuy = toScaledBigInt(minOutcomeTokens);
   }
 
   const bet = await eventService.getBet(betId);
@@ -119,8 +117,8 @@ exports.placeBet = async (userId, betId, amount, outcome, minOutcomeTokens) => {
         userId: userId,
         betId: bet._id,
         outcomeIndex: outcome,
-        investmentAmount: toBigDecimal(amount),
-        outcomeTokens: toBigDecimal(outcomeResult.boughtOutcomeTokens),
+        investmentAmount: fromScaledBigInt(amount),
+        outcomeTokens: fromScaledBigInt(outcomeResult.boughtOutcomeTokens),
       });
 
       response.trade = await trade.save({ session });
@@ -128,7 +126,7 @@ exports.placeBet = async (userId, betId, amount, outcome, minOutcomeTokens) => {
       console.debug(LOG_TAG, 'Trade saved successfully');
     });
 
-    await eventService.placeBet(user, bet, toBigDecimal(amount), outcome);
+    await eventService.placeBet(user, bet, fromScaledBigInt(amount), outcome);
 
     publishEvent(notificationEvents.EVENT_BET_PLACED, {
       producer: 'user',
@@ -266,15 +264,16 @@ exports.resolve = async ({
   // find out how much each individual user invested
   const investedValues = {}; // userId -> value
   for (const interaction of ammInteraction) {
-    const amount = Number(interaction.amount) / Number(WFAIR.ONE);
+    const amount = fromScaledBigInt(interaction.amount);
+
     if (interaction.direction === 'BUY') {
       // when user bought, add this amount to value invested
       investedValues[interaction.buyer] = investedValues[interaction.buyer]
-        ? investedValues[interaction.buyer] + amount
+        ? amount.plus(investedValues[interaction.buyer])
         : amount;
     } else if (interaction.direction === 'SELL') {
       // when user sells, decrease amount invested
-      investedValues[interaction.buyer] = investedValues[interaction.buyer] - amount;
+      investedValues[interaction.buyer] = investedValues[interaction.buyer].minus(amount);
     }
   }
 
@@ -283,7 +282,7 @@ exports.resolve = async ({
   for (const resolvedResult of resolveResults) {
     const userId = resolvedResult.owner;
     const { balance } = resolvedResult;
-    const winToken = toBigDecimal(balance);
+    const winToken = fromScaledBigInt(balance);
 
     if (userId.includes('_')) {
       continue;
@@ -308,7 +307,7 @@ exports.resolve = async ({
       betId,
       bet.marketQuestion,
       bet.outcomes[outcomeIndex].name,
-      Math.round(investedValues[userId]),
+      +investedValues[userId],
       event.previewImageUrl,
       winToken
     );

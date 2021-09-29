@@ -16,7 +16,7 @@ const tradeService = require('../services/trade-service');
 const betService = require('../services/bet-service');
 
 const { ErrorHandler } = require('../util/error-handler');
-const { toBigInt, toBigDecimal } = require('../util/number-helper');
+const { toScaledBigInt, fromScaledBigInt } = require('../util/number-helper');
 const { isAdmin } = require('../helper');
 const { calculateAllBetsStatus } = require('../services/event-service');
 const logger = require('../util/logger');
@@ -214,7 +214,7 @@ const pullOutBet = async (req, res, next) => {
 
     let requiredMinReturnAmount = 0n;
     if (minReturnAmount) {
-      requiredMinReturnAmount = toBigInt(minReturnAmount);
+      requiredMinReturnAmount = toScaledBigInt(minReturnAmount);
     }
 
     const userId = req.user.id;
@@ -263,7 +263,7 @@ const pullOutBet = async (req, res, next) => {
         user,
         userId,
         bet,
-        toBigDecimal(newBalances?.earnedTokens),
+        fromScaledBigInt(newBalances?.earnedTokens),
         outcome,
         0n
       );
@@ -294,13 +294,13 @@ const calculateBuyOutcome = async (req, res, next) => {
     const bet = await Bet.findById(id);
     const betContract = new BetContract(id, bet.outcomes.length);
 
-    let buyAmount = toBigInt(amount);
+    let buyAmount = toScaledBigInt(amount);
 
     const result = [];
 
     for (const outcome of bet.outcomes) {
       const outcomeSellAmount = await betContract.calcBuy(buyAmount, outcome.index);
-      result.push({ index: outcome.index, outcome: toBigDecimal(outcomeSellAmount) });
+      result.push({ index: outcome.index, outcome: fromScaledBigInt(outcomeSellAmount) });
     }
 
     res.status(200).json(result);
@@ -323,7 +323,7 @@ const calculateSellOutcome = async (req, res, next) => {
   try {
     const bet = await Bet.findById(id);
     const betContract = new BetContract(id, bet.outcomes.length);
-    const bigAmount = toBigInt(amount);
+    const bigAmount = toScaledBigInt(amount);
     const result = [];
 
     for (const outcome of bet.outcomes) {
@@ -331,7 +331,7 @@ const calculateSellOutcome = async (req, res, next) => {
         bigAmount,
         outcome.index
       );
-      result.push({ index: outcome.index, outcome: toBigDecimal(outcomeSellAmount) });
+      result.push({ index: outcome.index, outcome: fromScaledBigInt(outcomeSellAmount) });
     }
 
     res.status(200).json(result);
