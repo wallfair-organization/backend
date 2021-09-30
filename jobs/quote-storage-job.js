@@ -12,46 +12,31 @@
  *  PRIMARY KEY(betid, option, trx_timestamp)
  * );
  */
-const format = require('pg-format');
 const DEFAULT_CHANNEL = 'system';
 let subClient;
 
-const { BetContract, Erc20, pool } = require('@wallfair.io/smart_contract_mock');
-const WFAIR = new Erc20('WFAIR');
-let one = parseInt(WFAIR.ONE);
-
-const INSERT_PRICE_ACTION = 'INSERT INTO amm_price_action (betid, trx_timestamp, outcomeindex, quote) values %L'
+const { BetContract, pool } = require('@wallfair.io/smart_contract_mock');
 
 async function onBetPlaced(message) {
   const { _id: betId, outcomes } = message.data.bet;
   const betContract = new BetContract(betId, outcomes.length);
 
-  const timestamp = new Date().toISOString();
-  const valuePromises = outcomes.map(
-    outcome => betContract.calcBuy(WFAIR.ONE, outcome.index).then(p => [
-      betId,
-      timestamp,
-      outcome.index,
-      Math.min(1 / (parseInt(p) / one), 1),
-    ])
-  );
+  const initialPrices = await betContract.calcBuyAllOutcomes();
+  const values = initialPrices.map(betContract.toUnitInterval);
 
-  const values = await Promise.all(valuePromises);
-  await pool.query(format(INSERT_PRICE_ACTION, values));
+  return betContract.insertPrices(values);
 }
 
 async function onNewBet(message) {
   const { _id: betId, outcomes } = message.data.bet;
-  const initialQuote = 1 / outcomes.length;
+
   const timestamp = new Date();
   timestamp.setMinutes(timestamp.getMinutes() - 5);
-  const values = outcomes.map(outcome => [
-    betId,
-    timestamp.toISOString(),
-    outcome.index,
-    initialQuote,
-  ]);
-  await pool.query(format(INSERT_PRICE_ACTION, values));
+
+  const betContract = new BetContract(betId, outcomes.length);
+  const initialPrice = betContract.calcInitialPrice();
+
+  return betContract.insertPrices(outcomes.map(() => initialPrice), timestamp.toISOString());
 }
 
 module.exports = {
