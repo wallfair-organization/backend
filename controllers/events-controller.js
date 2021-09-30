@@ -38,13 +38,14 @@ const listEvents = async (req, res, next) => {
 };
 
 const filterEvents = async (req, res) => {
-  const { category, sortby, searchQuery, type } = req.params;
+  const { category, sortby, searchQuery, type, state } = req.params;
   const count = +req.params.count;
   const page = +req.params.page;
 
   const eventList = await eventService.filterEvents(
     type,
     category,
+    state,
     count,
     page,
     sortby,

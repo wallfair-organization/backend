@@ -16,7 +16,7 @@ router.get('/list',
   checkAdmin,
   eventController.listEvents);
 
-router.get('/list/:type/:category/:count/:page/:sortby',
+router.get('/list/:type/:category/:state/:count/:page/:sortby',
   checkAdmin,
   eventController.filterEvents);
 
@@ -32,7 +32,7 @@ router.get('/bets/:type/:category/:count/:page/:sortby',
   checkAdmin,
   betController.filterBets);
 
-router.get('/list/:type/:category/:count/:page/:sortby/:searchQuery',
+router.get('/list/:type/:category/:state/:count/:page/:sortby/:searchQuery',
   checkAdmin,
   eventController.filterEvents);
 

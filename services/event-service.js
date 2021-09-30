@@ -77,6 +77,7 @@ exports.listEvents = async (q) => {
 exports.filterEvents = async (
   type = 'all',
   category = 'all',
+  state = 'all',
   count = 10,
   page = 1,
   sortby = 'name',
@@ -93,6 +94,10 @@ exports.filterEvents = async (
 
   if (category !== 'all') {
     query.category = category;
+  }
+
+  if (state !== 'all') {
+    query.state = state;
   }
 
   // only filter by searchQuery if it is present
