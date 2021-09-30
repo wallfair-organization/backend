@@ -15,7 +15,7 @@
 const DEFAULT_CHANNEL = 'system';
 let subClient;
 
-const { BetContract, pool } = require('@wallfair.io/smart_contract_mock');
+const { BetContract } = require('@wallfair.io/smart_contract_mock');
 
 async function onBetPlaced(message) {
   const { _id: betId, outcomes } = message.data.bet;
