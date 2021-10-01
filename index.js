@@ -15,6 +15,7 @@ const wallfair = require('@wallfair.io/wallfair-commons');
 const { handleError } = require('./util/error-handler');
 const jwt = require('jsonwebtoken');
 const logger = require('./util/logger');
+const { checkJwt } = require('./services/auth0-service');
 
 /**
  * CORS options
@@ -163,21 +164,14 @@ async function main() {
   const notificationEventsRoutes = require('./routes/users/notification-events-routes');
   const authRoutes = require('./routes/auth/auth-routes');
 
-  const auth0ShowcaseRoutes = require('./routes/auth0-showcase-routes');
-  server.use(auth0ShowcaseRoutes);
-
 
   // Using Routes
   server.use('/api/event', eventRoutes);
-  server.use('/api/event', passport.authenticate('jwt', { session: false }), secureEventRoutes);
+  server.use('/api/event', checkJwt, secureEventRoutes);
   server.use('/api/user', userRoute);
-  server.use('/api/user', passport.authenticate('jwt', { session: false }), secureUserRoute);
-  server.use('/api/rewards', passport.authenticate('jwt', { session: false }), secureRewardsRoutes);
-  server.use(
-    '/api/bet-template',
-    passport.authenticate('jwt', { session: false }),
-    secureBetTemplateRoute
-  );
+  server.use('/api/user', checkJwt, secureUserRoute);
+  server.use('/api/rewards', checkJwt, secureRewardsRoutes);
+  server.use('/api/bet-template', checkJwt, secureBetTemplateRoute);
   server.use('/webhooks/twitch/', twitchWebhook);
   server.use('/api/chat', chatRoutes);
   server.use('/api/notification-events', notificationEventsRoutes);
