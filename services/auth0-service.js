@@ -2,6 +2,7 @@ const { ManagementClient } = require('auth0')
 const jwt = require('express-jwt');
 const jwtAuthz = require('express-jwt-authz');
 const jwksRsa = require('jwks-rsa');
+const logger = require('../util/logger');
 
 const {
   AUTH0_DOMAIN,
@@ -19,17 +20,12 @@ if (!AUTH0_AUDIENCE) throw new Error("AUTH0_AUDIENCE isn't defined")
  * This is completely intended for internal use and not to be exposed via route or similar.
  */
 
-/**
- * @type import('auth0').ManagementClientOptions
- */
-const options = {
+const managementClient = new ManagementClient({
   domain: AUTH0_DOMAIN,
   clientId: AUTH0_CLIENT_ID,
   clientSecret: AUTH0_CLIENT_SECRET,
-  audience: AUTH0_AUDIENCE
-};
-
-const managementClient = new ManagementClient(options);
+  audience: AUTH0_AUDIENCE,
+});
 
 /**
  * Depends on weather we're storing the password or not.
@@ -64,16 +60,18 @@ exports.updateUser = async function changePassword(auth0UserId, newPassword) {
  * @param {string} userData.email
  * @param {string} userData.password
  * @param {string} userData.phoneNumber
+ * @param {string} userData.username
  * @returns
  */
 exports.createUser = async function (wfairUserId, userData) {
-  return managementClient.createUser({
+  logger.info("Create auth0 user with the following data", userData)
+  return await managementClient.createUser({
     connection: process.env.AUTH0_CONNECTION_ID,
     email: userData.email,
     password: userData.password,
-    email_verified: false,
+    // we set this to true to not trigger an Auth0 email. Surely it can be disabled in the Auth0 backend
+    email_verified: true,
     phone_number: userData.phoneNumber,
-    phone_verified: false,
     user_metadata: {
       // this reflects our own user mongoDB user Id
       wfairUserId,

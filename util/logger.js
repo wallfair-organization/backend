@@ -2,7 +2,7 @@
 module.exports = {
   /** logs won't be displayed on NODE_ENV production */
   info(message, ...args) {
-    if (process.env.NODE_ENV === 'STAGING') console.log('INFO', message, args);
+    console.log('INFO', message, args);
   },
   /** Method to log errors */
   error(message, ...args) {

@@ -14,8 +14,7 @@ const mongoose = require('mongoose');
 const wallfair = require('@wallfair.io/wallfair-commons');
 const { handleError } = require('./util/error-handler');
 const jwt = require('jsonwebtoken');
-
-let mongoURL = process.env.DB_CONNECTION;
+const logger = require('./util/logger');
 
 /**
  * CORS options
@@ -45,7 +44,7 @@ const corsOptions = {
 
 // Connection to Database
 async function connectMongoDB() {
-  const connection = await mongoose.connect(mongoURL, {
+  const connection = await mongoose.connect(process.env.DB_CONNECTION, {
     useUnifiedTopology: true,
     useNewUrlParser: true,
     useFindAndModify: false,
@@ -53,10 +52,10 @@ async function connectMongoDB() {
     readPreference: 'primary',
     retryWrites: true,
   });
-  console.log('Connection to Mongo-DB successful');
+  logger.info('Connection to Mongo-DB successful');
 
   wallfair.initModels(connection);
-  console.log('Mongoose models initialized');
+  logger.info('Mongoose models initialized');
 
   return connection;
 }
@@ -122,8 +121,8 @@ async function main() {
   websocketService.setPubClient(pubClient);
 
   // When message arrive from Redis, disseminate to proper channels
-  subClient.on('message', (_, message) => {
-    // console.log(`[REDIS] Incoming : ${message}`);
+  subClient.on('message', (channel, message) => {
+    //logger.info(`[REDIS] Incoming : ${message}`);
     const messageObj = JSON.parse(message);
 
     if (messageObj.to === '*') {
@@ -219,7 +218,7 @@ async function main() {
   const appServer = httpServer.listen(process.env.PORT || 8000, () => {
     const { port } = appServer.address();
 
-    console.log(`API runs on port: ${port}`);
+    logger.info(`API runs on port: ${port}`);
   });
 }
 

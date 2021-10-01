@@ -16,9 +16,7 @@ const { INFLUENCERS, WFAIR_REWARDS } = require("../util/constants");
 module.exports = {
   async createUser(req, res, next) {
     const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return next(new ErrorHandler(422, errors));
-    }
+    if (!errors.isEmpty()) return next(new ErrorHandler(422, errors));
 
     try {
       const { password, email, username, ref, recaptchaToken } = req.body;
@@ -43,8 +41,24 @@ module.exports = {
       const wFairUserId = new ObjectId().toHexString();
       const counter = ((await userApi.getUserEntriesAmount()) || 0) + 1;
       const passwordHash = await bcrypt.hash(password, 8);
-
       const emailCode = generate(6);
+      
+      // create auth0 user
+      // const auth0User = await auth0Service.createUser(wFairUserId, {
+      //   email,
+      //   username: username || `wallfair-${counter}`,
+      //   password,
+      //   app_metadata: {},
+      //   user_metadata: {
+      //     // this reflects our own user mongoDB user Id
+      //     appId: wFairUserId,
+      //   },
+      // });
+      // logger.info("Created auth0User", auth0User)
+
+      // if (!auth0User) {
+      //   return next(new ErrorHandler(500, "Couldn't create auth0 user"));
+      // }
 
       const createdUser = await userApi.createUser({
         _id: wFairUserId,
@@ -57,6 +71,10 @@ module.exports = {
         },
         ref
       });
+      logger.info("Created WFair user", createdUser)
+      if (!createdUser) {
+        return next(new ErrorHandler(500, "Couldn't create WFAIR user"));
+      }
 
       // TODO: When there's time, delete Auth0 user if WFAIR creation fails
 
