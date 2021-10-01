@@ -85,8 +85,9 @@ exports.createUser = async function (wfairUserId, userData) {
  * @returns void
  */
 exports.deleteUser = async function (auth0UserId) {
-  return managementClient.deleteUser({ id: auth0UserId })
+  return await managementClient.deleteUser({ id: auth0UserId })
 }
+
 /**
  * Authorization middleware. When used, the
  * Access Token must exist and be verified against
@@ -94,7 +95,6 @@ exports.deleteUser = async function (auth0UserId) {
  * The middleware doesn't check if the token has the sufficient scope to access
  * the requested resources!
  */
-
 exports.checkJwt = jwt({
   // Dynamically provide a signing key
   // based on the kid in the header and
@@ -103,7 +103,7 @@ exports.checkJwt = jwt({
     cache: true,
     rateLimit: true,
     jwksRequestsPerMinute: 5,
-    jwksUri: `https://${AUTH0_DOMAIN}/.well-known/jwks.json`
+    jwksUri: `https://${AUTH0_DOMAIN}/.well-known/jwks.json`,
   }),
 
   // Validate the audience and the issuer.
@@ -112,5 +112,5 @@ exports.checkJwt = jwt({
   algorithms: ['RS256'],
 });
 
-// TODO Let's see if we want the work with scopes here
+// TODO @gmussi Do you want to work with Auth0 scopes?
 exports.checkScopes = jwtAuthz(['read:messages']);
