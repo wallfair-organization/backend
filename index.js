@@ -176,7 +176,6 @@ async function main() {
   server.use('/api/chat', chatRoutes);
   server.use('/api/notification-events', notificationEventsRoutes);
   server.use('/api/auth', authRoutes);
-
   // Error handler middleware
   // eslint-disable-next-line no-unused-vars
   server.use((err, req, res, next) => {
@@ -214,6 +213,10 @@ async function main() {
 
     console.log(`API runs on port: ${port}`);
   });
+
+  return server
 }
 
-main();
+const app = main();
+
+module.exports = app;
