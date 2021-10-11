@@ -192,11 +192,11 @@ Successful Result:
         "hot": true,
         "outcomes": [
           {
-            "index": 0, 
+            "index": 0,
             "name": "Jonas"
           },
           {
-            "index": 0, 
+            "index": 0,
             "name": "Jörn"
           }
         ],
@@ -614,4 +614,137 @@ Successful Result:
     "type": "streamed",
     "category": "Chess"
 }
+```
+
+### GET http://localhost:8000/api/rewards/questions
+Successful Result:
+```json
+[
+  {
+    "closed": false,
+    "_id": "613efc97cbad81c04dbf7198",
+    "title": "Do you like wallfair?",
+    "questions": [
+      {
+        "index": 0,
+        "name": "Yes",
+        "imageUrl": "https://photostorage.mock/457y8hurbge8h79j2w8"
+      },
+      {
+        "index": 1,
+        "name": "No",
+        "imageUrl": "https://photostorage.mock/457f87h7n4789fh3nw8"
+      }
+    ],
+    "createdAt": "1631517847345",
+    "closedAt": "1631517847345"
+  }
+]
+```
+
+### POST http://localhost:8000/api/rewards/answer
+```json
+{
+  "answerId": 1,
+  "questionId": "613efc97cbad81c04dbf7198",
+}
+```
+
+Successful Result: Lottery Ticket ID
+```json
+{
+  "id":"613f0bc91612edc558d0e5c9"
+}
+```
+
+### GET http://localhost:8000/api/bet-template
+
+Successful Result: Lottery Ticket ID
+```json
+[{
+  "_id": "613f0bc91612edc558d0e5c9",
+  "marketQuestion": "Who will win?",
+  "name": "winner template",
+  "category": "counter-strike",
+  "outcomes": [
+    {
+      "index": 0,
+      "name": "Team A",
+    },
+    {
+      "index": 1,
+      "name": "Team B",
+    }
+  ]
+}]
+```
+
+
+# Auth Endpoints
+### POST http://localhost:8000/api/auth/login
+```json
+{
+  "username": "foo",
+  "password": "bar",
+}
+```
+Successful Result:
+```json
+[
+  {
+    "userId": "613efc97cbad81c04dbf7198",
+    "session": ""
+  }
+]
+```
+### POST http://localhost:8000/api/auth/sign-up
+```json
+{
+  "username": "foo",
+  "password": "bar",
+  "passwordConfirm": "bar",
+}
+```
+Successful Result:
+```json
+[
+  {
+    "userId": "613efc97cbad81c04dbf7198",
+    "email": "user@example.com"
+  }
+]
+```
+### POST http://localhost:8000/api/auth/verify-email
+```json
+{
+  "email": "user@example.com"
+}
+```
+### POST http://localhost:8000/api/auth/reset-password
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+# Auth0
+
+Watch out, current Auth0 CORS, callback etc. hosts are set to `http://localhost:3000` & `https://*.wallfair.oi` everthing else __won't__ work, except you change this in Auth0 itself.
+
+##
+
+## Setup
+
+* Add the corresponding env vars. You'll find them in `.env-example`
+* UI callback URL must be `http://localhost:3000/callback`
+
+## Auth0 Endpoints
+
+These endpoints are intended for internal backend usage only. Do not publish this somewhere even though these endpoints aren't confidential.
+![Auth0 Endpoints](./documentation/images/auth0/auth0-oauth-endpoints.png "Auth0 Endpoints")
+
+
+## Example link with email confirmation:
+```txt
+http://localhost:8000/api/user/confirm-email/?userId=615c3d8d8b6d8bc4066046b1&code=555555
 ```

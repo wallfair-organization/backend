@@ -1,32 +1,31 @@
 databases:
+- cluster_name: production-mongodb
+  engine: MONGODB
+  name: production-mongodb
+  production: true
+  version: "4"
+- cluster_name: production-redis
+  engine: REDIS
+  name: production-redis
+  production: true
+  version: "6"
 - cluster_name: prod-db
+  db_name: defaultdb
+  db_user: doadmin
   engine: PG
   name: prod-db
   production: true
   version: "13"
-- cluster_name: prod-redis
-  engine: REDIS
-  name: prod-redis
-  production: true
-  version: "6"
-- cluster_name: prod-mongo
-  engine: MONGODB
-  name: prod-mongo
-  production: true
-  version: "4"
 envs:
-- key: DB_CONNECTION
-  scope: RUN_AND_BUILD_TIME
-  value: ${prod-mongo.DATABASE_URL}
 - key: REDIS_CONNECTION
   scope: RUN_AND_BUILD_TIME
-  value: ${prod-redis.DATABASE_URL}
+  value: ${production-redis.DATABASE_URL}
 name: production-backend
 region: fra
 services:
 - envs:
   - key: JWT_KEY
-    scope: RUN_TIME
+    scope: RUN_AND_BUILD_TIME
     value: $JWT_KEY
   - key: TWILIO_ACC_SID
     scope: RUN_AND_BUILD_TIME
@@ -39,10 +38,10 @@ services:
     value: $TWILIO_SID
   - key: ENVIRONMENT
     scope: RUN_AND_BUILD_TIME
-    value: PRODUCTIVE
+    value: PRODUCTION
   - key: VERIFY_URL
     scope: RUN_AND_BUILD_TIME
-    value: https://demo.wallfair.io/
+    value: https://play.wallfair.io/
   - key: GMAIL_USERNAME
     scope: RUN_AND_BUILD_TIME
     value: noreply@wallfair.io
@@ -60,7 +59,7 @@ services:
     value: prod-db-do-user-9290946-0.b.db.ondigitalocean.com
   - key: POSTGRES_DB
     scope: RUN_AND_BUILD_TIME
-    value: defaultdb
+    value: $PRODUCTION_POSTGRES_DB
   - key: POSTGRES_PASSWORD
     scope: RUN_AND_BUILD_TIME
     value: $POSTGRES_PASSWORD
@@ -70,9 +69,6 @@ services:
   - key: POSTGRES_PORT
     scope: RUN_AND_BUILD_TIME
     value: "25060"
-  - key: NODE_OPTIONS
-    scope: RUN_AND_BUILD_TIME
-    value: --max-old-space-size=8192
   - key: BACKEND_URL
     scope: RUN_AND_BUILD_TIME
     value: "https://prod-k9lh9.ondigitalocean.app"
@@ -91,6 +87,39 @@ services:
   - key: ADMIN_PASSWORD
     scope: RUN_AND_BUILD_TIME
     value: $ADMIN_PASSWORD
+  - key: GOOGLE_API_KEY
+    scope: RUN_AND_BUILD_TIME
+    value: $GOOGLE_API_KEY
+  - key: DB_CONNECTION
+    scope: RUN_AND_BUILD_TIME
+    value: $PRODUCTION_MONGO_DB_URL
+  - key: AUTH0_DOMAIN
+    scope: RUN_AND_BUILD_TIME
+    value: $AUTH0_DOMAIN
+  - key: AUTH0_CLIENT_ID
+    scope: RUN_AND_BUILD_TIME
+    value: $AUTH0_CLIENT_ID
+  - key: AUTH0_CLIENT_SECRET
+    scope: RUN_AND_BUILD_TIME
+    value: $AUTH0_CLIENT_SECRET
+  - key: AUTH0_AUDIENCE
+    scope: RUN_AND_BUILD_TIME
+    value: $AUTH0_AUDIENCE
+  - key: AUTH0_CONNECTION_ID
+    scope: RUN_AND_BUILD_TIME
+    value: $AUTH0_CONNECTION_ID
+  - key: AWS_S3_CLIENT_ID
+    scope: RUN_AND_BUILD_TIME
+    value: $AWS_S3_CLIENT_ID
+  - key: AWS_S3_CLIENT_SECRET
+    scope: RUN_AND_BUILD_TIME
+    value: $AWS_S3_CLIENT_SECRET
+  - key: AWS_S3_CLIENT_BUCKET
+    scope: RUN_AND_BUILD_TIME
+    value: $AWS_S3_CLIENT_BUCKET
+  - key: AWS_S3_CLIENT_REGION
+    scope: RUN_AND_BUILD_TIME
+    value: $AWS_S3_CLIENT_REGION
   http_port: 80
   image:
     registry_type: DOCR
@@ -98,7 +127,7 @@ services:
     tag: $VERSION
   instance_count: 2
   instance_size_slug: professional-xs
-  name: prod
+  name: production
   routes:
   - path: /
   source_dir: /

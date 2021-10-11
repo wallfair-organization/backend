@@ -1,187 +1,219 @@
 // Import and configure dotenv to enable use of environmental variable
 const dotenv = require('dotenv');
+
 dotenv.config();
 
 // Import express
 const express = require('express');
-const http    = require('http');
-
-const { handleError } = require('./util/error-handler');
+const http = require('http');
 
 // Import mongoose to connect to Database
 const mongoose = require('mongoose');
 
 // Import Models from Wallfair Commons
-const wallfair = require("@wallfair.io/wallfair-commons");
+const wallfair = require('@wallfair.io/wallfair-commons');
+const { handleError } = require('./util/error-handler');
+const jwt = require('jsonwebtoken');
 
 let mongoURL = process.env.DB_CONNECTION;
-if(process.env.ENVIRONMENT === 'STAGING') {
-    mongoURL = mongoURL.replace('admin?authSource=admin', 'wallfair?authSource=admin');
-    mongoURL += '&replicaSet=wallfair&tls=true&tlsCAFile=/usr/src/app/ssl/staging.crt';
-} else if(process.env.ENVIRONMENT === 'PRODUCTIVE') {
-    mongoURL = mongoURL.replace('admin?authSource=admin', 'wallfair?authSource=admin');
-    mongoURL += '&replicaSet=wallfair&tls=true&tlsCAFile=/usr/src/app/ssl/productive.crt';
+
+/**
+ * CORS options
+ * @type import('cors').CorsOptions
+ */
+const corsOptions = {
+  origin: '*',
+  credentials: true,
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With',
+    'Content-Type',
+    'Accept',
+    'X-Access-Token',
+    'Authorization',
+  ],
+  exposedHeaders: ['Content-Length'],
+  preflightContinue: false,
 }
 
 // Connection to Database
 async function connectMongoDB() {
-    const connection = await mongoose.connect(mongoURL, {
-        useUnifiedTopology: true,
-        useNewUrlParser:    true,
-    });
-    console.log('Connection to Mongo-DB successful');
-    
-    wallfair.initModels(connection);
-    console.log('Mongoose models initialized');
+  const connection = await mongoose.connect(mongoURL, {
+    useUnifiedTopology: true,
+    useNewUrlParser: true,
+    useFindAndModify: false,
+    useCreateIndex: true,
+    readPreference: 'primary',
+    retryWrites: true,
+  });
+  console.log('Connection to Mongo-DB successful');
 
-    return connection;
+  wallfair.initModels(connection);
+  console.log('Mongoose models initialized');
+
+  return connection;
 }
 
 async function main() {
-    const mongoDBConnection = await connectMongoDB();
+  const mongoDBConnection = await connectMongoDB();
 
-    //Import Admin service
-    const adminService = require('./services/admin-service');
-    adminService.setMongoose(mongoDBConnection);
-    adminService.initialize();
+  // Import Admin service
+  const adminService = require('./services/admin-service');
+  adminService.setMongoose(mongoDBConnection);
+  adminService.initialize();
 
-    const { initBetsJobs } = require("./jobs/bets-jobs");
-    initBetsJobs();
+  const { initBetsJobs } = require('./jobs/bets-jobs');
+  initBetsJobs();
 
-    const { initTwitchSubscribeJob } = require("./jobs/twitch-subscribe-job");
-    initTwitchSubscribeJob();
+  const { initTwitchSubscribeJob } = require('./jobs/twitch-subscribe-job');
+  initTwitchSubscribeJob();
 
-    //Import Socket.io service
-    const websocketService = require('./services/websocket-service');
+  const { initYoutubeCheckJob } = require('./jobs/youtube-live-check-job');
+  initYoutubeCheckJob();
 
-    //Import cors
-    const cors = require('cors');
+  // Import Socket.io service
+  const websocketService = require('./services/websocket-service');
 
-    // Import middleware for jwt verification
-    const passport = require('passport');
-    require('./util/auth');
+  // Import cors
+  const cors = require('cors');
 
-    // Initialise server using express
-    const server      = express();
-    const httpServer  = http.createServer(server);
+  // Import middleware for jwt verification
+  const passport = require('passport');
+  require('./util/auth');
 
-    // Create socket.io server
-    const socketioJwt = require('socketio-jwt');
-    const { Server }  = require('socket.io');
-    const io          = new Server(httpServer, {
-        cors: {
-            origin:         '*',
-            methods:        ['GET', 'POST'],
-            allowedHeaders: ['*'],
-            credentials:    true,
-        },
+  // Initialise server using express
+  const server = express();
+  const httpServer = http.createServer(server);
+  server.use(cors(corsOptions));
+
+  // Create socket.io server
+  const { Server } = require('socket.io');
+  const io = new Server(httpServer, {
+    cors: corsOptions,
+  });
+
+  // Create Redis pub and sub clients
+  const { createClient } = require('redis');
+  const pubClient = createClient({
+    url: process.env.REDIS_CONNECTION,
+    no_ready_check: false,
+  });
+  const subClient = createClient({
+    url: process.env.REDIS_CONNECTION,
+    no_ready_check: false,
+  });
+
+  const { init } = require('./services/notification-service');
+  init(pubClient);
+
+  const { initQuoteJobs } = require('./jobs/quote-storage-job');
+  initQuoteJobs(subClient);
+
+  const awsS3Service = require('./services/aws-s3-service');
+  awsS3Service.init();
+
+  websocketService.setPubClient(pubClient);
+
+  // When message arrive from Redis, disseminate to proper channels
+  subClient.on('message', (_, message) => {
+    // console.log(`[REDIS] Incoming : ${message}`);
+    const messageObj = JSON.parse(message);
+
+    if (messageObj.to === '*') {
+      io.of('/').emit(messageObj.event, messageObj.data);
+    } else {
+      io.of('/').to(messageObj.to).emit(messageObj.event, messageObj.data);
+    }
+  });
+
+  subClient.subscribe('message');
+
+  // Giving server ability to parse json
+  server.use(passport.initialize());
+  server.use(passport.session());
+  adminService.buildRouter();
+
+  server.use(adminService.getRootPath(), adminService.getRouter());
+  server.use(adminService.getLoginPath(), adminService.getRouter());
+  server.use(express.json({ limit: '5mb' }));
+  server.use(express.urlencoded({ limit: '5mb', extended: true }));
+
+  // Home Route
+  server.get('/', (req, res) => {
+    res.status(200).send({
+      message: 'Blockchain meets Prediction Markets made Simple. - Wallfair.',
     });
+  });
 
-    // Create Redis pub and sub clients
-    const { createClient } = require("redis");
-    const pubClient = createClient({
-        url: process.env.REDIS_CONNECTION,
-        no_ready_check: false
+  // Import Routes
+  const userRoute = require('./routes/users/users-routes');
+  const secureEventRoutes = require('./routes/users/secure-events-routes');
+  const secureRewardsRoutes = require('./routes/users/secure-rewards-routes');
+  const eventRoutes = require('./routes/users/events-routes');
+  const secureUserRoute = require('./routes/users/secure-users-routes');
+  const secureBetTemplateRoute = require('./routes/users/secure-bet-template-routes');
+  const twitchWebhook = require('./routes/webhooks/twitch-webhook');
+  const chatRoutes = require('./routes/users/chat-routes');
+  const notificationEventsRoutes = require('./routes/users/notification-events-routes');
+  const authRoutes = require('./routes/auth/auth-routes');
+
+  const auth0ShowcaseRoutes = require('./routes/auth0-showcase-routes');
+  server.use(auth0ShowcaseRoutes);
+
+
+  // Using Routes
+  server.use('/api/event', eventRoutes);
+  server.use('/api/event', passport.authenticate('jwt', { session: false }), secureEventRoutes);
+  server.use('/api/user', userRoute);
+  server.use('/api/user', passport.authenticate('jwt', { session: false }), secureUserRoute);
+  server.use('/api/rewards', passport.authenticate('jwt', { session: false }), secureRewardsRoutes);
+  server.use(
+    '/api/bet-template',
+    passport.authenticate('jwt', { session: false }),
+    secureBetTemplateRoute
+  );
+  server.use('/webhooks/twitch/', twitchWebhook);
+  server.use('/api/chat', chatRoutes);
+  server.use('/api/notification-events', notificationEventsRoutes);
+  server.use('/api/auth', authRoutes);
+
+  // Error handler middleware
+  // eslint-disable-next-line no-unused-vars
+  server.use((err, req, res, next) => {
+    handleError(err, res);
+  });
+
+  io.use((socket, next) => {
+    let userId;
+
+    try {
+      const token = jwt.verify(socket.handshake.query.token, process.env.JWT_KEY);
+      userId = token.userId;
+    } catch (e) {
+      console.debug('[SOCKET] Invalid user token');
+    }
+
+    socket.userId = userId;
+    next();
+  });
+
+  io.on('connection', (socket) => {
+    const userId = socket.userId;
+
+    socket.on('chatMessage', (data) => {
+      if (userId) websocketService.handleChatMessage(socket, data, userId);
     });
-    const subClient = createClient({
-        url: process.env.REDIS_CONNECTION,
-        no_ready_check: false
-    });
-    websocketService.setPubClient(pubClient)
+    socket.on('joinRoom', (data) => websocketService.handleJoinRoom(socket, data, userId));
 
-    // When message arrive from Redis, disseminate to proper channels
-    subClient.on('message', function (channel, message) {
-        console.log('[REDIS] Incoming : ' + message);
-        const messageObj = JSON.parse(message);
+    socket.on('leaveRoom', (data) => websocketService.handleLeaveRoom(socket, data, userId));
+  });
 
-        // intercept certain messages
-        // TODO how will this scale? 
-        if (messageObj.event === "CASINO_REWARD") {
-            // if user is receiving a casino reward, update user.amountWon
-            // this notification is generated by the crash game backend
-            // https://github.com/wallfair-organization/crash_game_backend/
-            const userService = require('./services/user-service');
-            userService.increaseAmountWon(messageObj.to, messageObj.data.reward);
-        }
+  // Let server run and listen
+  const appServer = httpServer.listen(process.env.PORT || 8000, () => {
+    const { port } = appServer.address();
 
-        io.of('/').to(messageObj.to).emit(messageObj.event, messageObj.data);
-    });
-
-    subClient.subscribe('message');
-
-    websocketService.setIO(io);
-
-    // Giving server ability to parse json
-    server.use(passport.initialize());
-    server.use(passport.session());
-    adminService.buildRouter();
-    server.use(adminService.getRootPath(), adminService.getRouter());
-    server.use(adminService.getLoginPath(), adminService.getRouter());
-    server.use(express.json());
-    
-
-    // Home Route
-    server.get('/', (req, res) => {
-        res.status(200).send({
-            message: 'Blockchain meets Prediction Markets made Simple. - Wallfair.',
-        });
-    });
-
-    // Import Routes
-    const userRoute         = require('./routes/users/users-routes');
-    const secureEventRoutes = require('./routes/users/secure-events-routes');
-    const eventRoutes       = require('./routes/users/events-routes');
-    const secureUserRoute   = require('./routes/users/secure-users-routes');
-    const twitchWebhook = require('./routes/webhooks/twitch-webhook');
-
-    server.use(cors());
-
-    // Using Routes
-    server.use('/api/event', eventRoutes);
-    server.use('/api/event', passport.authenticate('jwt', { session: false }), secureEventRoutes);
-
-    server.use('/api/user', userRoute);
-    server.use('/api/user', passport.authenticate('jwt', { session: false }), secureUserRoute);
-    
-    server.use('/webhooks/twitch/', twitchWebhook);
-
-    // Error handler middleware
-    server.use((err, req, res, next) => {
-        handleError(err, res);
-    });
-
-    io.use(socketioJwt.authorize({
-        secret:               process.env.JWT_KEY,
-        handshake: true
-    }));
-
-    io.on('connection',  (socket) => {
-        const userId = socket.decoded_token.userId;
-
-        socket.on(
-            'chatMessage',
-            (data) => {
-                websocketService.handleChatMessage(socket, data, userId);
-            }
-        );
-        socket.on(
-            'joinRoom',
-            (data) => websocketService.handleJoinRoom(socket, data, userId),
-        );
-
-        socket.on(
-            'leaveRoom',
-            (data) => websocketService.handleLeaveRoom(socket, data, userId),
-        );
-    });
-
-
-    // Let server run and listen
-    const appServer = httpServer.listen(process.env.PORT || 8000, function () {
-        const port = appServer.address().port;
-
-        console.log(`API runs on port: ${port}`);
-    });
+    console.log(`API runs on port: ${port}`);
+  });
 }
 
 main();

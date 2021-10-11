@@ -27,6 +27,11 @@ jobs:
       TWITCH_CALLBACK_SECRET: ${{ secrets.TWITCH_CALLBACK_SECRET }}
       ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      STAGING_MONGO_DB_URL: ${{ secrets.STAGING_MONGO_DB_URL }}
+      PRODUCTION_MONGO_DB_URL: ${{ secrets.PRODUCTION_MONGO_DB_URL }}
+      STAGING_POSTGRES_DB: ${{ secrets.STAGING_POSTGRES_DB }}
+      PRODUCTION_POSTGRES_DB: ${{ secrets.PRODUCTION_POSTGRES_DB }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2

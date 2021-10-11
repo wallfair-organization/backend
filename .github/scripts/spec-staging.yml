@@ -17,9 +17,6 @@ databases:
   production: true
   version: "13"
 envs:
-- key: DB_CONNECTION
-  scope: RUN_AND_BUILD_TIME
-  value: ${wallfair.DATABASE_URL}
 - key: REDIS_CONNECTION
   scope: RUN_AND_BUILD_TIME
   value: ${redis.DATABASE_URL}
@@ -62,7 +59,7 @@ services:
     value: prod-db-do-user-9290946-0.b.db.ondigitalocean.com
   - key: POSTGRES_DB
     scope: RUN_AND_BUILD_TIME
-    value: testdb
+    value: $STAGING_POSTGRES_DB
   - key: POSTGRES_PASSWORD
     scope: RUN_AND_BUILD_TIME
     value: $POSTGRES_PASSWORD
@@ -90,6 +87,39 @@ services:
   - key: ADMIN_PASSWORD
     scope: RUN_AND_BUILD_TIME
     value: $ADMIN_PASSWORD
+  - key: GOOGLE_API_KEY
+    scope: RUN_AND_BUILD_TIME
+    value: $GOOGLE_API_KEY
+  - key: DB_CONNECTION
+    scope: RUN_AND_BUILD_TIME
+    value: $STAGING_MONGO_DB_URL
+  - key: AUTH0_DOMAIN
+    scope: RUN_AND_BUILD_TIME
+    value: $AUTH0_DOMAIN
+  - key: AUTH0_CLIENT_ID
+    scope: RUN_AND_BUILD_TIME
+    value: $AUTH0_CLIENT_ID
+  - key: AUTH0_CLIENT_SECRET
+    scope: RUN_AND_BUILD_TIME
+    value: $AUTH0_CLIENT_SECRET
+  - key: AUTH0_AUDIENCE
+    scope: RUN_AND_BUILD_TIME
+    value: $AUTH0_AUDIENCE
+  - key: AUTH0_CONNECTION_ID
+    scope: RUN_AND_BUILD_TIME
+    value: $AUTH0_CONNECTION_ID
+  - key: AWS_S3_CLIENT_ID
+    scope: RUN_AND_BUILD_TIME
+    value: $AWS_S3_CLIENT_ID
+  - key: AWS_S3_CLIENT_SECRET
+    scope: RUN_AND_BUILD_TIME
+    value: $AWS_S3_CLIENT_SECRET
+  - key: AWS_S3_CLIENT_BUCKET
+    scope: RUN_AND_BUILD_TIME
+    value: $AWS_S3_CLIENT_BUCKET
+  - key: AWS_S3_CLIENT_REGION
+    scope: RUN_AND_BUILD_TIME
+    value: $AWS_S3_CLIENT_REGION
   http_port: 80
   image:
     registry_type: DOCR

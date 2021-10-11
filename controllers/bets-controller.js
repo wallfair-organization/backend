@@ -6,337 +6,536 @@ dotenv.config();
 const { validationResult } = require('express-validator');
 
 // Import User and Bet model
-const { User, Bet, Trade } = require("@wallfair.io/wallfair-commons").models;
-
-const bigDecimal = require('js-big-decimal');
+const { User, Bet } = require('@wallfair.io/wallfair-commons').models;
 
 // Import Auth Service
+const { BetContract } = require('@wallfair.io/smart_contract_mock');
 const eventService = require('../services/event-service');
 const userService = require('../services/user-service');
 const tradeService = require('../services/trade-service');
 const betService = require('../services/bet-service');
 
 const { ErrorHandler } = require('../util/error-handler');
+const { toScaledBigInt, fromScaledBigInt } = require('../util/number-helper');
+const { isAdmin } = require('../helper');
+const { calculateAllBetsStatus } = require('../services/event-service');
+const logger = require('../util/logger');
 
-const { BetContract, Erc20 } = require('@wallfair.io/smart_contract_mock');
-const WFAIR = new Erc20('WFAIR');
+const listBets = async (req, res, next) => {
+  try {
+    const betList = await betService.listBets();
+    return res.status(200).json(calculateAllBetsStatus(betList));
+
+  } catch (err) {
+    logger.error(err);
+    next(res.status(422).send(err));
+  }
+};
+
+const filterBets = async (req, res, next) => {
+  try {
+    const { category, sortby, searchQuery, type, status, published, resolved, canceled } = req.params;
+    const count = +req.params.count;
+    const page = +req.params.page;
+
+    const betList = await betService.filterBets(
+      type,
+      category,
+      count,
+      page,
+      sortby,
+      searchQuery,
+      status,
+      published,
+      resolved,
+      canceled,
+    );
+
+    return res.status(200).json(betList);
+
+  } catch (err) {
+    logger.error(err);
+    next(res.status(422).send(err));
+  }
+};
 
 const createBet = async (req, res, next) => {
-    const LOG_TAG = '[CREATE-BET]';
-    // Validating User Inputs
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return next(new ErrorHandler(422, 'Invalid input passed, please check it'));
+  const LOG_TAG = '[CREATE-BET]';
+  // Validating User Inputs
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return next(new ErrorHandler(422, 'Invalid input passed, please check it'));
+  }
+
+  try {
+    const {
+      event: eventId,
+      marketQuestion,
+      slug,
+      outcomes,
+      description,
+      evidenceSource,
+      evidenceDescription,
+      date,
+      published,
+      endDate,
+    } = req.body;
+
+    let event = await eventService.getEvent(eventId);
+    if (!event) {
+      return next(new ErrorHandler(404, 'Event not found'));
     }
 
+    if (event.type === 'non-streamed' && event.bets.length === 1) {
+      return next(new ErrorHandler(422, 'Non-streamed events can only have one bet.'));
+    }
+
+    console.debug(LOG_TAG, event);
+    console.debug(LOG_TAG, {
+      event: eventId,
+      marketQuestion,
+      slug,
+      outcomes,
+      evidenceSource,
+      evidenceDescription,
+      date: new Date(date),
+      published,
+      creator: req.user.id,
+      endDate: new Date(endDate),
+    });
+
+    const createdBet = new Bet({
+      event: eventId,
+      marketQuestion,
+      slug,
+      outcomes: outcomes.map(({ name }, index) => ({ index, name })),
+      description,
+      evidenceSource,
+      evidenceDescription,
+      date: new Date(date),
+      creator: req.user.id,
+      published,
+      endDate: new Date(endDate),
+    });
+
+    const session = await Bet.startSession();
     try {
-        const { eventId, marketQuestion, description, hot, outcomes, endDate, slug } = req.body;
-        let event = await eventService.getEvent(eventId);
+      await session.withTransaction(async () => {
+        console.debug(LOG_TAG, 'Save Bet to MongoDB');
+        const dbBet = await eventService.saveBet(createdBet, session);
 
-        console.debug(LOG_TAG, event);
-        console.debug(LOG_TAG, {
-            marketQuestion: marketQuestion,
-            hot: hot,
-            outcomes: outcomes,
-            endDate: endDate,
-            event: eventId,
-            creator: req.user.id,
-            slug: slug,
-        });
+        if (!event.bets) event.bets = [];
 
-        const outcomesDb = outcomes.map((outcome, index) => ({ index, name: outcome.value }));
+        console.debug(LOG_TAG, 'Save Bet to Event');
+        event.bets.push(dbBet._id);
+        event = await eventService.saveEvent(event, session);
 
-        const createBet = new Bet({
-            marketQuestion: marketQuestion,
-            description: description,
-            hot: hot,
-            outcomes: outcomesDb,
-            date: endDate,
-            event: eventId,
-            creator: req.user.id,
-            slug: slug,
-        });
+        await eventService.provideLiquidityToBet(createdBet);
+      });
 
-        const session = await Bet.startSession();
-        try {
-            await session.withTransaction(async () => {
-                console.debug(LOG_TAG, 'Save Bet to MongoDB');
-                await eventService.saveBet(createBet, session);
-
-                if (!event.bets) {
-                    event.bets = [];
-                }
-
-                console.debug(LOG_TAG, 'Save Bet to Event');
-                event.bets.push(createBet);
-                event = await eventService.saveEvent(event, session);
-
-                await eventService.provideLiquidityToBet(createBet);
-            });
-
-            await eventService.betCreated(createBet, req.user.id);
-        } finally {
-            await session.endSession();
-        }
-
-        res.status(201).json(event);
-    } catch (err) {
-        console.error(err.message);
-        next(new ErrorHandler(422, err.message));
+      await eventService.betCreated(createdBet, req.user);
+    } finally {
+      await session.endSession();
     }
+    await event.save();
+    return res.status(201).json(event);
+  } catch (err) {
+    console.error(err.message);
+    return next(new ErrorHandler(422, err.message));
+  }
+};
+
+const editBet = async (req, res, next) => {
+  if (!isAdmin(req)) return next(new ErrorHandler(403, 'Action not allowed'));
+
+  try {
+    const existingBet = await Bet.findById(req.params.betId);
+    if (!existingBet) {
+      return next(new ErrorHandler(404, 'Bet not found.'));
+    }
+
+    const { outcomes: oldOutcomes } = existingBet;
+    const { outcomes: newOutcomes } = req.body;
+
+    const indexes = ({ index }) => +index;
+
+    if (
+      oldOutcomes.length !== newOutcomes.length ||
+      new Set([ // uniqify all indexes to ensure no new ones are added
+        ...newOutcomes.map(indexes),
+        ...oldOutcomes.map(indexes),
+      ]).size !== oldOutcomes.length
+    ) {
+      return next(new ErrorHandler(400, 'Cannot change outcome indexes or add/remove outcomes.'));
+    }
+
+    if (
+      new Set(newOutcomes.map(indexes)).size !== newOutcomes.length
+    ) {
+      return next(new ErrorHandler(400, 'Outcome indexes must be unique.'));
+    }
+
+    const updatedEntry = await betService.editBet(req.params.betId, req.body);
+    if (!updatedEntry) {
+      return res.status(500).send();
+    }
+    return res.status(200).json(updatedEntry);
+  } catch (err) {
+    return next(new ErrorHandler(422, err.message));
+  }
 };
 
 const placeBet = async (req, res, next) => {
-    // Validating User Inputs
-    const errors = validationResult(req);
+  // Validating User Inputs
+  const errors = validationResult(req);
 
-    let { amount, outcome, minOutcomeTokens } = req.body;
+  const { amount, outcome, minOutcomeTokens } = req.body;
 
-    if (!errors.isEmpty() || amount <= 0) {
-        return next(new ErrorHandler(422, 'Invalid input passed, please check it'));
-    }
+  if (!errors.isEmpty() || amount <= 0) {
+    return next(new ErrorHandler(422, 'Invalid input passed, please check it'));
+  }
 
-    try {
-        const response = await betService.placeBet(
-            req.user.id, 
-            req.params.id, 
-            amount, 
-            outcome, 
-            minOutcomeTokens);
-            
-        res.status(200).json(response);
-    } catch (err) {
-        console.error(err);
-        next(new ErrorHandler(422, err.message));
-    }
+  try {
+    const response = await betService.placeBet(
+      req.user.id,
+      req.params.id,
+      amount,
+      outcome,
+      minOutcomeTokens
+    );
+
+    return res.status(200).json(response);
+  } catch (err) {
+    console.error(err);
+    return next(new ErrorHandler(422, err.message));
+  }
+};
+
+const getTrade = async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return next(new ErrorHandler(422, 'Invalid input passed, please check it'));
+  }
+
+  try {
+    let trade = await betService.getTrade(req.params.id);
+
+    return res.status(200).json(trade);
+  } catch (err) {
+    console.error(err);
+    return next(new ErrorHandler(422, err.message));
+  }
 };
 
 const pullOutBet = async (req, res, next) => {
-    const LOG_TAG = '[PULLOUT-BET]';
-    // Validating User Inputs
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return next(new ErrorHandler(422, 'Invalid input passed, please check it'));
+  const LOG_TAG = '[PULLOUT-BET]';
+  // Validating User Inputs
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return next(new ErrorHandler(422, 'Invalid input passed, please check it'));
+  }
+
+  try {
+    // Defining User Inputs
+    const { outcome, minReturnAmount } = req.body;
+    const { id } = req.params;
+
+    let requiredMinReturnAmount = 0n;
+    if (minReturnAmount) {
+      requiredMinReturnAmount = toScaledBigInt(minReturnAmount);
     }
 
+    const userId = req.user.id;
+
+    console.debug(LOG_TAG, 'Pulling out Bet', id, req.user.id);
+    const bet = await eventService.getBet(id);
+
+    if (!eventService.isBetTradable(bet)) {
+      return next(
+        new ErrorHandler(405, 'No further action can be performed on an event/bet that has ended!')
+      );
+    }
+
+    const user = await userService.getUserReducedDataById(userId);
+    let sellAmount;
+
+    const session = await User.startSession();
     try {
-        // Defining User Inputs
-        let { outcome, minReturnAmount } = req.body;
-        const id = req.params.id;
+      let newBalances;
 
-        let requiredMinReturnAmount = 0n;
-        if (minReturnAmount) {
-            requiredMinReturnAmount = BigInt(minReturnAmount);
-        }
+      await session
+        .withTransaction(async () => {
+          console.debug(LOG_TAG, 'Interacting with the AMM');
+          const betContract = new BetContract(id, bet.outcomes.length);
 
-        const userId = req.user.id;
+          sellAmount = await betContract.getOutcomeToken(outcome).balanceOf(userId);
+          console.debug(
+            LOG_TAG,
+            `SELL ${userId} ${sellAmount} ${outcome} ${requiredMinReturnAmount}`
+          );
 
-        console.debug(LOG_TAG, 'Pulling out Bet', id, req.user.id);
-        const bet = await eventService.getBet(id);
+          await tradeService.closeTrades(userId, bet, outcome, 'sold', session);
+          console.debug(LOG_TAG, 'Trades closed successfully');
 
-        if (!eventService.isBetTradable(bet)) {
-            return next(
-                new ErrorHandler(
-                    405,
-                    'No further action can be performed on an event/bet that has ended!'
-                )
-            );
-        }
+          newBalances = await betContract.sellAmount(
+            userId,
+            sellAmount,
+            outcome,
+            requiredMinReturnAmount
+          );
+          console.debug(LOG_TAG, 'Successfully sold Tokens');
+        })
+        .catch((err) => console.error(err));
 
-        const user = await userService.getUserById(userId);
-        let sellAmount;
-
-        const session = await User.startSession();
-        try {
-            let newBalances;
-
-            await session.withTransaction(async () => {
-                console.debug(LOG_TAG, 'Interacting with the AMM');
-                const betContract = new BetContract(id, bet.outcomes.length);
-
-                sellAmount = await betContract.getOutcomeToken(outcome).balanceOf(userId);
-                console.debug(
-                    LOG_TAG,
-                    'SELL ' +
-                        userId +
-                        ' ' +
-                        sellAmount +
-                        ' ' +
-                        outcome +
-                        ' ' +
-                        requiredMinReturnAmount * WFAIR.ONE
-                );
-
-                newBalances = await betContract.sellAmount(
-                    userId,
-                    sellAmount,
-                    outcome,
-                    requiredMinReturnAmount * WFAIR.ONE
-                );
-                console.debug(LOG_TAG, 'Successfully sold Tokens');
-
-                await tradeService.closeTrades(user.id, bet, outcome, 'sold', session);
-                console.debug(LOG_TAG, 'Trades closed successfully');
-            }).catch((err) => console.error(err));
-
-            const bigAmount = new bigDecimal(newBalances?.earnedTokens);
-            await eventService.pullOutBet(user, bet, bigAmount.getPrettyValue(4, '.'), outcome, 0n);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            await session.endSession();
-        }
-
-        res.status(200).json(bet);
+      await eventService.pullOutBet(
+        user,
+        userId,
+        bet,
+        fromScaledBigInt(newBalances?.earnedTokens),
+        outcome,
+        0n
+      );
     } catch (err) {
-        console.error(err);
-        next(new ErrorHandler(422, err.message));
+      console.error(err);
+    } finally {
+      await session.endSession();
     }
+
+    res.status(200).json(bet);
+  } catch (err) {
+    console.error(err);
+    next(new ErrorHandler(422, err.message));
+  }
 };
 
 const calculateBuyOutcome = async (req, res, next) => {
-    const LOG_TAG = '[CALCULATE-BUY-OUTCOME]';
-    // Validating User Inputs
-    const errors = validationResult(req);
+  const errors = validationResult(req);
 
-    const { amount } = req.body;
-    const { id } = req.params;
+  const { amount } = req.body;
+  const { id } = req.params;
 
-    if (!errors.isEmpty() || amount <= 0) {
-        return next(new ErrorHandler(422, 'Invalid input passed, please check it'));
+  if (!errors.isEmpty() || amount <= 0) {
+    return next(new ErrorHandler(422, 'Invalid input passed, please check it'));
+  }
+
+  try {
+    const bet = await Bet.findById(id);
+    const betContract = new BetContract(id, bet.outcomes.length);
+
+    let buyAmount = toScaledBigInt(amount);
+
+    const result = [];
+
+    for (const outcome of bet.outcomes) {
+      const outcomeSellAmount = await betContract.calcBuy(buyAmount, outcome.index);
+      result.push({ index: outcome.index, outcome: fromScaledBigInt(outcomeSellAmount) });
     }
 
-    try {
-        const bet = await Bet.findById(id);
-        const betContract = new BetContract(id, bet.outcomes.length);
-
-        let buyAmount = parseFloat(amount).toFixed(4);
-        const bigAmount = new bigDecimal(buyAmount.toString().replace('.', ''));
-        buyAmount = BigInt(bigAmount.getValue());
-
-        const result = [];
-
-        for (const outcome of bet.outcomes) {
-            const outcomeSellAmount = await betContract.calcBuy(buyAmount, outcome.index);
-            const bigAmount = new bigDecimal(outcomeSellAmount);
-            result.push({ index: outcome.index, outcome: bigAmount.getPrettyValue(4, '.') });
-        }
-
-        res.status(200).json(result);
-    } catch (err) {
-        console.debug(err);
-        next(new ErrorHandler(422, err.message));
-    }
+    res.status(200).json(result);
+  } catch (err) {
+    console.debug(err);
+    next(new ErrorHandler(422, err.message));
+  }
 };
 
 const calculateSellOutcome = async (req, res, next) => {
-    const LOG_TAG = '[CALCULATE-SELL-OUTCOME]';
-    // Validating User Inputs
-    const errors = validationResult(req);
+  const errors = validationResult(req);
 
-    const { amount } = req.body;
-    const { id } = req.params;
+  const { amount } = req.body;
+  const { id } = req.params;
 
-    if (!errors.isEmpty() || amount <= 0) {
-        return next(new ErrorHandler(422, 'Invalid input passed, please check it'));
+  if (!errors.isEmpty() || amount <= 0) {
+    return next(new ErrorHandler(422, 'Invalid input passed, please check it'));
+  }
+
+  try {
+    const bet = await Bet.findById(id);
+    const betContract = new BetContract(id, bet.outcomes.length);
+    const bigAmount = toScaledBigInt(amount);
+    const result = [];
+
+    for (const outcome of bet.outcomes) {
+      const outcomeSellAmount = await betContract.calcSellFromAmount(
+        bigAmount,
+        outcome.index
+      );
+      result.push({ index: outcome.index, outcome: fromScaledBigInt(outcomeSellAmount) });
     }
 
-    try {
-        const bet = await Bet.findById(id);
-        const betContract = new BetContract(id, bet.outcomes.length);
-        let sellAmount = parseFloat(amount).toFixed(4);
-        const bigAmount = new bigDecimal(sellAmount.toString().replace('.', ''));
-        const result = [];
-
-        for (const outcome of bet.outcomes) {
-            const outcomeSellAmount = await betContract.calcSellFromAmount(
-                BigInt(bigAmount.getValue()),
-                outcome.index
-            );
-            const bigOutcome = new bigDecimal(outcomeSellAmount);
-            result.push({ index: outcome.index, outcome: bigOutcome.getPrettyValue(4, '.') });
-        }
-
-        res.status(200).json(result);
-    } catch (err) {
-        console.error(err);
-        next(new ErrorHandler(422, err.message));
-    }
+    res.status(200).json(result);
+  } catch (err) {
+    console.error(err);
+    next(new ErrorHandler(422, err.message));
+  }
 };
 
 const payoutBet = async (req, res, next) => {
-    const LOG_TAG = '[PAYOUT-BET]';
-    // Validating User Inputs
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return next(new ErrorHandler(422, 'Invalid input passed, please check it'));
-    }
+  const LOG_TAG = '[PAYOUT-BET]';
+  // Validating User Inputs
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return next(new ErrorHandler(422, 'Invalid input passed, please check it'));
+  }
+
+  try {
+    const id = req.params.id;
+    const session = await User.startSession();
+    let bet = {};
 
     try {
-        const id = req.params.od;
-        const session = await User.startSession();
-        let bet = {};
+      await session.withTransaction(async () => {
+        console.debug(LOG_TAG, 'Payout Bet', id, req.user.id);
+        bet = await eventService.getBet(id, session);
+        const user = await userService.getUserById(req.user.id, session);
 
-        try {
-            await session.withTransaction(async () => {
-                console.debug(LOG_TAG, 'Payout Bet', id, req.user.id);
-                bet = await eventService.getBet(id, session);
-                const user = await userService.getUserById(req.user.id, session);
+        console.debug(LOG_TAG, 'Payed out Bet');
+        // TODO store more information in closedBets
+        user.openBets = user.openBets.filter((item) => item !== bet.id);
+        user.closedBets.push(bet.id);
 
-                console.debug(LOG_TAG, 'Payed out Bet');
-                //TODO store more information in closedBets
-                user.openBets = user.openBets.filter((item) => item !== bet.id);
-                user.closedBets.push(bet.id);
+        await userService.saveUser(user, session);
 
-                await userService.saveUser(user, session);
-
-                console.debug(LOG_TAG, 'Requesting Bet Payout');
-                const betContract = new BetContract(id, bet.outcomes.length);
-                await betContract.getPayout(req.user.id);
-            });
-        } finally {
-            await session.endSession();
-        }
-        res.status(201).json(bet);
-    } catch (err) {
-        console.error(err.message);
-        next(new ErrorHandler(422, err.message));
+        console.debug(LOG_TAG, 'Requesting Bet Payout');
+        const betContract = new BetContract(id, bet.outcomes.length);
+        await betContract.getPayout(req.user.id);
+      });
+    } finally {
+      await session.endSession();
     }
+    res.status(201).json(bet);
+  } catch (err) {
+    console.error(err.message);
+    next(new ErrorHandler(422, err.message));
+  }
+};
+
+const resolveBet = async (req, res, next) => {
+  if (!isAdmin(req)) {
+    return next(new ErrorHandler(403, 'Action not allowed.'));
+  }
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return next(new ErrorHandler(422, errors));
+  }
+
+  try {
+    const { id: betId } = req.params;
+    const reporter = req.user.id;
+    const { outcomeIndex, evidenceActual, evidenceDescription } = req.body;
+
+    await betService.resolve({
+      betId,
+      outcomeIndex,
+      evidenceActual,
+      evidenceDescription,
+      reporter,
+    });
+
+    res.status(200).send();
+  } catch (err) {
+    return next(new ErrorHandler(422, err.message));
+  }
+};
+
+const cancelBet = async (req, res, next) => {
+  if (!isAdmin(req)) {
+    return next(new ErrorHandler(403, 'Action not allowed'));
+  }
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return next(new ErrorHandler(422, errors));
+  }
+
+  const { reasonOfCancellation } = req.body;
+  const { id } = req.params;
+
+  try {
+    const bet = await Bet.findById(id);
+    if (!bet) {
+      return next(new ErrorHandler(404, 'Bet does not exist'));
+    }
+
+    const cancelledBet = await betService.cancel(bet, reasonOfCancellation);
+
+    res.status(200).send(cancelledBet);
+  } catch (err) {
+    console.debug(err);
+    next(new ErrorHandler(422, err.message));
+  }
+
+};
+
+const deleteBet = async (req, res, next) => {
+  if (!isAdmin(req)) {
+    return next(new ErrorHandler(403, 'Action not allowed'));
+  }
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return next(new ErrorHandler(422, errors));
+  }
+
+  const { id } = req.params;
+  try {
+    const bet = await Bet.findById(id);
+    if (!bet) {
+      return next(new ErrorHandler(404, 'Bet does not exist.'));
+    }
+    if (!bet.canceled) {
+      return next(new ErrorHandler(422, 'Bet must be cancelled prior to deletion.'));
+    }
+
+    const deletedBet = await Bet.findByIdAndDelete(id);
+
+    res.status(200).send(deletedBet);
+  } catch (err) {
+    console.debug(err);
+    next(new ErrorHandler(422, err.message));
+  }
 };
 
 const betHistory = async (req, res, next) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return next(new ErrorHandler(422, errors));
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return next(new ErrorHandler(422, errors));
+  }
+
+  const { direction, rangeType, rangeValue } = req.query;
+  const { id } = req.params;
+
+  try {
+    const bet = await Bet.findById(id);
+    if (!bet) {
+      return next(new ErrorHandler(404, 'Bet does not exist'));
     }
 
-    let { direction, rangeType, rangeValue } = req.query;
-    const id = req.params.id;
+    const interactionsList = await eventService.combineBetInteractions(
+      bet,
+      direction,
+      rangeType,
+      rangeValue
+    );
 
-    try {
-        const bet = await Bet.findById(id);
-        if (!bet) {
-            return next(new ErrorHandler(404, 'Bet does not exist'));
-        }
-
-        let interactionsList = await eventService.combineBetInteractions(
-            bet,
-            direction,
-            rangeType,
-            rangeValue
-        );
-
-        res.status(200).json(interactionsList);
-    } catch (err) {
-        console.debug(err);
-        next(new ErrorHandler(422, err.message));
-    }
+    res.status(200).json(interactionsList);
+  } catch (err) {
+    console.debug(err);
+    next(new ErrorHandler(422, err.message));
+  }
 };
 
+exports.listBets = listBets;
+exports.filterBets = filterBets;
 exports.createBet = createBet;
+exports.editBet = editBet;
 exports.placeBet = placeBet;
 exports.pullOutBet = pullOutBet;
 exports.calculateBuyOutcome = calculateBuyOutcome;
 exports.calculateSellOutcome = calculateSellOutcome;
 exports.payoutBet = payoutBet;
 exports.betHistory = betHistory;
+exports.getTrade = getTrade;
+exports.resolveBet = resolveBet;
+exports.cancelBet = cancelBet;
+exports.deleteBet = deleteBet;

@@ -8,42 +8,52 @@ const { check, oneOf } = require('express-validator');
 const userController = require('../../controllers/users-controller');
 
 router.post(
-    '/bindWalletAddress',
-    [check('walletAddress').notEmpty()],
-    userController.bindWalletAddress
+  '/bindWalletAddress',
+  [check('walletAddress').notEmpty()],
+  userController.bindWalletAddress
 );
 
 router.post(
-    '/saveAdditionalInformation',
-    oneOf([
-        [
-            check('name').notEmpty(),
-            check('username').notEmpty(),
-            check('username').isLength({ min: 3 }),
-            check('name').isLength({ min: 3 }),
-        ],
-        check('email').isEmail(),
-    ]),
-    userController.saveAdditionalInformation
+  '/saveAdditionalInformation',
+  oneOf([
+    [
+      check('name').notEmpty(),
+      check('username').notEmpty(),
+      check('username').isLength({ min: 3, max: 25 }),
+      check('name').isLength({ min: 3 }),
+    ],
+    check('email').isEmail(),
+  ]),
+  userController.saveAdditionalInformation
 );
 
 router.post(
-    '/acceptConditions',
-    [check('conditions').isArray({ min: 3, max: 3 })],
-    userController.saveAcceptConditions
+  '/acceptConditions',
+  [check('conditions').isArray({ min: 3, max: 3 })],
+  userController.saveAcceptConditions
 );
 
 router.get('/refList', userController.getRefList);
 
 router.get('/open-bets', userController.getOpenBetsList);
 
-router.get('/transactions', userController.getTransactions);
+router.get('/history', userController.getHistory);
 
-router.get('/history', userController.getAMMHistory);
+router.get('/trade-history', userController.getTradeHistory);
 
 router.get('/resend-confirm', userController.resendConfirmEmail);
 
-router.patch('/:userId', userController.updateUser);
+router.patch(
+  '/:userId',
+  oneOf([[check('username').isLength({ min: 3, max: 25 }), check('email').isEmail()]]),
+  userController.updateUser
+);
+
+router.patch(
+  '/:userId/preferences',
+  [check('preferences').notEmpty()],
+  userController.updateUserPreferences
+);
 
 router.get('/:userId', userController.getUserInfo);
 
