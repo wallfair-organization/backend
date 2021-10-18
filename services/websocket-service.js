@@ -8,6 +8,7 @@ const notificationTypes = {
   EVENT_RESOLVE: 'Notification/EVENT_RESOLVE',
   EVENT_CANCEL: 'Notification/EVENT_CANCEL',
   BET_STARTED: 'Notification/BET_STARTED',
+  USER_LOCKED: 'Notification/USER_LOCKED',
 };
 
 exports.setPubClient = (newpub) => (pubClient = newpub);
