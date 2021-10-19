@@ -26,6 +26,7 @@ const managementClient = new ManagementClient({
   clientSecret: AUTH0_CLIENT_SECRET,
   audience: AUTH0_AUDIENCE,
 });
+exports.managementClient = managementClient;
 
 /**
  * Depends on weather we're storing the password or not.
@@ -61,7 +62,8 @@ exports.updateUser = async function changePassword(auth0UserId, newPassword) {
  * @param {string} userData.password
  * @param {string} userData.phoneNumber
  * @param {string} userData.username
- * @returns
+ *
+ * @returns {Promise}
  */
 exports.createUser = async function (wfairUserId, userData) {
   logger.info("Create auth0 user with the following data", userData)
