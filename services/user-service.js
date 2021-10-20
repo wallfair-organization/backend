@@ -5,8 +5,9 @@ const axios = require('axios');
 const { BetContract, Erc20 } = require('@wallfair.io/smart_contract_mock');
 const { fromScaledBigInt } = require('../util/number-helper');
 const { WFAIR_REWARDS } = require('../util/constants');
-const { publishEvent, notificationEvents } = require('./notification-service');
 const { updateUserData } = require('./notification-events-service');
+const { notificationEvents } = require('@wallfair.io/wallfair-commons/constants/eventTypes');
+const amqp = require('./amqp-service');
 const awsS3Service = require('./aws-s3-service');
 const _ = require('lodash');
 
@@ -135,7 +136,8 @@ exports.updateUser = async (userId, updatedUser) => {
     const oldName = _.clone(user.name);
     user.name = updatedUser.name;
 
-    publishEvent(notificationEvents.EVENT_USER_CHANGED_NAME, {
+    amqp.send('universal_events', 'event.user_changed_name', JSON.stringify({
+      event: notificationEvents.EVENT_USER_CHANGED_NAME,
       producer: 'user',
       producerId: userId,
       data: {
@@ -144,15 +146,16 @@ exports.updateUser = async (userId, updatedUser) => {
         oldName: oldName,
         updatedAt: Date.now()
       },
+      date: Date.now(),
       broadcast: true
-    });
+    }));
 
     await updateUserData({
       userId,
-      'data.user.name': {$exists: true}
+      'data.user.name': { $exists: true }
     }, {
       'data.user.name': updatedUser.name
-    }).catch((err)=> {
+    }).catch((err) => {
       console.error('updateUserData failed', err)
     })
   }
@@ -161,7 +164,8 @@ exports.updateUser = async (userId, updatedUser) => {
     const oldUsername = _.clone(user.username);
     user.username = updatedUser.username;
 
-    publishEvent(notificationEvents.EVENT_USER_CHANGED_USERNAME, {
+    amqp.send('universal_events', 'event.user_changed_username', JSON.stringify({
+      event: notificationEvents.EVENT_USER_CHANGED_USERNAME,
       producer: 'user',
       producerId: userId,
       data: {
@@ -170,17 +174,18 @@ exports.updateUser = async (userId, updatedUser) => {
         oldUsername,
         updatedAt: Date.now()
       },
+      date: Date.now(),
       broadcast: true
-    });
+    }));
 
     //update username across the events for this user, only when data.user exists at all, we need to have these unified across the events,
     // so for user specific things, we need to use proper user property
     await updateUserData({
       userId,
-      'data.user.username': {$exists: true}
+      'data.user.username': { $exists: true }
     }, {
       'data.user.username': updatedUser.username
-    }).catch((err)=> {
+    }).catch((err) => {
       console.error('updateUserData failed', err)
     })
   }
@@ -193,7 +198,8 @@ exports.updateUser = async (userId, updatedUser) => {
     const imageLocation = await awsS3Service.upload(userId, updatedUser.image);
     user.profilePicture = imageLocation.split('?')[0];
 
-    publishEvent(notificationEvents.EVENT_USER_UPLOADED_PICTURE, {
+    amqp.send('universal_events', 'event.user_uploaded_picture', JSON.stringify({
+      event: notificationEvents.EVENT_USER_UPLOADED_PICTURE,
       producer: 'user',
       producerId: userId,
       data: {
@@ -202,22 +208,25 @@ exports.updateUser = async (userId, updatedUser) => {
         image: updatedUser.image,
         updatedAt: Date.now()
       },
+      date: Date.now(),
       broadcast: true
-    });
+    }));
   }
 
   if (updatedUser.notificationSettings && updatedUser.notificationSettings !== user.notificationSettings) {
     user.notificationSettings = updatedUser.notificationSettings;
 
-    publishEvent(notificationEvents.EVENT_USER_UPDATED_EMAIL_PREFERENCES, {
+    amqp.send('universal_events', 'event.user_updated_email_preferences', JSON.stringify({
+      event: notificationEvents.EVENT_USER_UPDATED_EMAIL_PREFERENCES,
       producer: 'user',
       producerId: userId,
-      data: { notificationSettings: user.notificationSettings },
-    });
+      data: { notificationSettings: user.notificationSettings }
+    }));
   }
 
   if (updatedUser.aboutMe && user.aboutMe !== updatedUser.aboutMe) {
-    publishEvent(notificationEvents.EVENT_USER_CHANGED_ABOUT_ME, {
+    amqp.send('universal_events', 'event.user_changed_about_me', JSON.stringify({
+      event: notificationEvents.EVENT_USER_CHANGED_ABOUT_ME,
       producer: 'user',
       producerId: userId,
       data: {
@@ -226,8 +235,9 @@ exports.updateUser = async (userId, updatedUser) => {
         notificationSettings: user.notificationSettings,
         updatedAt: Date.now()
       },
+      date: Date.now(),
       broadcast: true
-    });
+    }));
 
     user.aboutMe = updatedUser.aboutMe;
   }
@@ -246,11 +256,12 @@ exports.updateUserPreferences = async (userId, preferences) => {
     user.preferences.currency = preferences.currency;
   }
 
-  publishEvent(notificationEvents.EVENT_USER_SET_CURRENCY, {
+  amqp.send('universal_events', 'event.user_set_currency', JSON.stringify({
+    event: notificationEvents.EVENT_USER_SET_CURRENCY,
     producer: 'user',
     producerId: userId,
     data: { currency: user.preferences.currency },
-  });
+  }));
 
   return await user.save();
 };
