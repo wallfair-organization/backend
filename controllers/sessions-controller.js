@@ -5,7 +5,6 @@ const { ErrorHandler } = require('../util/error-handler');
 const authService = require('../services/auth-service');
 const { validationResult } = require('express-validator');
 const userService = require('../services/user-service');
-const auth0Service = require('../services/auth0-service');
 const mailService = require('../services/mail-service');
 const { generate } = require('../helper');
 const bcrypt = require('bcryptjs');
