@@ -44,20 +44,6 @@ module.exports = {
       const counter = ((await userApi.getUserEntriesAmount()) || 0) + 1;
       const passwordHash = await bcrypt.hash(password, 8);
 
-      // create auth0 user
-      const auth0User = auth0Service.createUser(wFairUserId, {
-        email,
-        username: username || `wallfair-${counter}`,
-        password,
-        app_metadata: {},
-        user_metadata: {
-          // this reflects our own user mongoDB user Id
-          appId: wFairUserId,
-        },
-      });
-
-      if (!auth0User) throw new Error("Couldn't create auth0 user")
-
       const emailCode = generate(6);
 
       const createdUser = await userApi.createUser({
@@ -69,7 +55,6 @@ module.exports = {
         preferences: {
           currency: 'WFAIR',
         },
-        auth0Id: auth0User.user_id,
         ref
       });
 
