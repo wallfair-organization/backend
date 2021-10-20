@@ -37,7 +37,10 @@ async function onBetPlaced(message) {
   );
 
   const values = await Promise.all(valuePromises);
-  await pool.query(format(INSERT_PRICE_ACTION, values));
+
+  await pool.query(format(INSERT_PRICE_ACTION, values)).catch((err)=> {
+    console.error('onBetPlaced => INSERT_PRICE_ACTION', err);
+  });
 }
 
 async function onNewBet(message) {
@@ -64,13 +67,17 @@ module.exports = {
 
     subClient.on('message', async (_, message) => {
       const messageObj = JSON.parse(message);
-      if (messageObj.event === 'Notification/EVENT_BET_PLACED') {
-        await onBetPlaced(messageObj);
-        return;
-      }
+      //fix for duplicated handlers, ignore when extra broadcast message is emmited,
+      // it was always duplicated when broadcast:true
+      if(!messageObj.to) {
+        if (messageObj.event === 'Notification/EVENT_BET_PLACED') {
+          await onBetPlaced(messageObj);
+          return;
+        }
 
-      if (messageObj.event === 'Notification/EVENT_NEW_BET') {
-        await onNewBet(messageObj);
+        if (messageObj.event === 'Notification/EVENT_NEW_BET') {
+          await onNewBet(messageObj);
+        }
       }
     });
   }
