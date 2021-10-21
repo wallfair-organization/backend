@@ -1,0 +1,2 @@
+ENVIRONMENT=auth0
+CLIENT_URL=https://auth0.wallfair.io

@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backend-ingress
+spec:
+  tls:
+  - hosts:
+    - auth0-api.wallfair.io
+    secretName: backend-auth0-cert-secret
+  rules:
+  - host: auth0-api.wallfair.io
+    http:
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: backend
+              port:
+                number: 80

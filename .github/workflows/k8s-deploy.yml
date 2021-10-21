@@ -7,6 +7,7 @@ on:
       - main
       - production
       - development
+      - f/mvp-441/auth0-migration
 
 jobs:
   build_and_push:
@@ -56,6 +57,15 @@ jobs:
             cd infra/environments/development
             kustomize edit set image registry.digitalocean.com/wallfair/backend_k8s:${GITHUB_SHA::6}
             kustomize build .
+      - name: Edit deployment image (auth0)
+        if: github.ref == 'refs/heads/f/mvp-441/auth0-migration'
+        uses: stefanprodan/kube-tools@v1
+        with:
+          kustomize: 4.2.0
+          command: |
+            cd infra/environments/auth0
+            kustomize edit set image registry.digitalocean.com/wallfair/backend_k8s:${GITHUB_SHA::6}
+            kustomize build .
       - name: Edit deployment image (production)
         if: github.ref == 'refs/heads/production'
         uses: stefanprodan/kube-tools@v1
@@ -77,6 +87,12 @@ jobs:
           KUBE_CONFIG: ${{ secrets.K8S_CONFIG_TEST }}
         with:
           args: apply -k infra/environments/development
+      - uses: actions-hub/kubectl@master
+        if: github.ref == 'refs/heads/f/mvp-441/auth0-migration'
+        env:
+          KUBE_CONFIG: ${{ secrets.K8S_CONFIG_TEST }}
+        with:
+          args: apply -k infra/environments/auth0
       - uses: actions-hub/kubectl@master
         if: github.ref == 'refs/heads/production'
         env:
