@@ -1,6 +1,5 @@
 const dotenv = require('dotenv');
 dotenv.config();
-const bcrypt = require('bcrypt');
 const logger = require('../util/logger')
 const mongoose = require('mongoose');
 const wallfair = require('@wallfair.io/wallfair-commons');

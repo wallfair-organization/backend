@@ -57,6 +57,13 @@ const verifyEmail = async (email) => {
 
 const getUserEntriesAmount = async () => User.countDocuments({}).exec();
 
+const getByAuth0IdOrEmail = async (auth0Id, email) => User.findOne({
+  $or: [
+    { auth0Id },
+    { email },
+  ],
+}).exec();
+
 module.exports = {
   createUser,
   updateUser,
@@ -64,4 +71,5 @@ module.exports = {
   getUserByIdEmailPhoneOrUsername,
   verifyEmail,
   getUserEntriesAmount,
+  getByAuth0IdOrEmail,
 };

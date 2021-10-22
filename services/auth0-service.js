@@ -2,7 +2,6 @@ const { ManagementClient } = require('auth0')
 const jwt = require('express-jwt');
 const jwtAuthz = require('express-jwt-authz');
 const jwksRsa = require('jwks-rsa');
-const logger = require('../util/logger');
 
 const {
   AUTH0_DOMAIN,
@@ -20,10 +19,14 @@ if (!AUTH0_AUDIENCE) throw new Error("AUTH0_AUDIENCE isn't defined")
  * This is completely intended for internal use and not to be exposed via route or similar.
  */
 
-const managementClient = new ManagementClient({
+const clientConfig = {
   domain: AUTH0_DOMAIN,
   clientId: AUTH0_CLIENT_ID,
   clientSecret: AUTH0_CLIENT_SECRET,
+};
+
+const managementClient = new ManagementClient({
+  ...clientConfig,
   audience: AUTH0_AUDIENCE,
 });
 exports.managementClient = managementClient;
@@ -66,7 +69,6 @@ exports.updateUser = async function changePassword(auth0UserId, newPassword) {
  * @returns {Promise}
  */
 exports.createUser = async function (wfairUserId, userData) {
-  logger.info("Create auth0 user with the following data", userData)
   return await managementClient.createUser({
     connection: process.env.AUTH0_CONNECTION_ID,
     email: userData.email,
@@ -88,6 +90,10 @@ exports.createUser = async function (wfairUserId, userData) {
  */
 exports.deleteUser = async function (auth0UserId) {
   return await managementClient.deleteUser({ id: auth0UserId })
+}
+
+exports.updateUserMetadata = async function (auth0UserId, data) {
+  return await managementClient.updateUserMetadata({ id: auth0UserId }, data);
 }
 
 /**

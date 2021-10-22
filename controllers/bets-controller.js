@@ -339,7 +339,7 @@ const calculateBuyOutcome = async (req, res, next) => {
   }
 
   try {
-    const bet = await Bet.findById(id);
+    const bet = await Bet.findById(id).orFail();
     const betContract = new BetContract(id, bet.outcomes.length);
 
     let buyAmount = toScaledBigInt(amount);

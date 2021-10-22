@@ -2,7 +2,7 @@ const { ObjectId } = require('mongodb')
 const logger = require('../util/logger');
 const userApi = require('../services/user-api');
 const { ErrorHandler } = require('../util/error-handler');
-const authService = require('../services/auth-service');
+const auth0Service = require('../services/auth0-service');
 const { validationResult } = require('express-validator');
 const userService = require('../services/user-service');
 const mailService = require('../services/mail-service');
@@ -11,7 +11,6 @@ const bcrypt = require('bcryptjs');
 const axios = require('axios');
 const { publishEvent, notificationEvents } = require('../services/notification-service');
 const { INFLUENCERS, WFAIR_REWARDS } = require("../util/constants");
-
 
 module.exports = {
   async createUser(req, res, next) {
@@ -44,21 +43,21 @@ module.exports = {
       const emailCode = generate(6);
       
       // create auth0 user
-      // const auth0User = await auth0Service.createUser(wFairUserId, {
-      //   email,
-      //   username: username || `wallfair-${counter}`,
-      //   password,
-      //   app_metadata: {},
-      //   user_metadata: {
-      //     // this reflects our own user mongoDB user Id
-      //     appId: wFairUserId,
-      //   },
-      // });
-      // logger.info("Created auth0User", auth0User)
+      const auth0User = await auth0Service.createUser(wFairUserId, {
+        email,
+        username: username || `wallfair-${counter}`,
+        password,
+        app_metadata: {},
+        user_metadata: {
+          // this reflects our own user mongoDB user Id
+          appId: wFairUserId,
+        },
+      });
+      logger.info("Created auth0User", auth0User)
 
-      // if (!auth0User) {
-      //   return next(new ErrorHandler(500, "Couldn't create auth0 user"));
-      // }
+      if (!auth0User) {
+        return next(new ErrorHandler(500, "Couldn't create auth0 user"));
+      }
 
       const createdUser = await userApi.createUser({
         _id: wFairUserId,
@@ -140,28 +139,43 @@ module.exports = {
     }
   },
 
-  async login(req, res, next) {
+  async verify(req, res, next) {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return next(new ErrorHandler(422, errors));
     }
 
     try {
-      const { userIdentifier, password } = req.body;
-      const user = await userApi.getUserByIdEmailPhoneOrUsername(userIdentifier);
+      const { userIdentifier, email } = req.body;
+      let newUser = false;
+      let user = await userApi.getByAuth0IdOrEmail(userIdentifier, email);
 
       if (!user) {
-        console.log("ERROR ", "User not found upon login!", req.body);
-        return next(new ErrorHandler(401, 'Invalid login'));
+        newUser = true;
+        const counter = ((await userApi.getUserEntriesAmount()) || 0) + 1;
+        const emailCode = generate(6);
+        user = await userApi.createUser({
+          email,
+          emailCode,
+          username: `wallfair-${counter}`,
+          preferences: {
+            currency: 'WFAIR',
+          },
+          auth0Id: userIdentifier,
+        });
+        await userService.mintUser(user.id.toString());
+        await mailService.sendConfirmMail(user);
+        await auth0Service.updateUserMetadata(userIdentifier, { wfairUserId: user.id });
       }
 
-      const valid = user && (await bcrypt.compare(password, user.password));
+      if (user && !user.auth0Id) {
+        user.auth0Id = userIdentifier;
+        await user.save();
+        await auth0Service.updateUserMetadata(userIdentifier, { wfairUserId: user.id });
+      }
+
       if (user.status === 'locked') {
         return next(new ErrorHandler(403, 'Your account is locked'));
-      }
-
-      if (!valid) {
-        return next(new ErrorHandler(401, 'Invalid login'));
       }
 
       publishEvent(notificationEvents.EVENT_USER_SIGNED_IN, {
@@ -177,8 +191,8 @@ module.exports = {
       });
 
       res.status(200).json({
-        userId: user.id,
-        session: await authService.generateJwt(user),
+        userId: user._id.toString(),
+        newUser,
       });
     } catch (err) {
       logger.error(err);
