@@ -109,7 +109,7 @@ const getCasinoGamesAmountLost = async (userId, gameId) => {
     userId
   };
 
-  if(gameId) {
+  if (gameId) {
     matchFilter['data.gameTypeId'] = gameId;
   }
 
@@ -303,6 +303,10 @@ const getUserStats = async (userId) => {
     console.error(err);
   });
 
+  const userBetsAllInCount = await getAllInBets(userId).catch((err)=> {
+    console.error(err);
+  });
+
   return {
     casinoGamePlayCount,
     casinoGameCashoutCount,
@@ -310,12 +314,13 @@ const getUserStats = async (userId) => {
     casinoGamesAmountLost,
     userBetsAmount,
     userBetsCashouts,
-    userBetsRewards
+    userBetsRewards,
+    userBetsAllInCount: userBetsAllInCount.length || 0
   }
 };
 
 /***
- * Get getAllInBets
+ * Get getAllInBets, ignore decimals in comparison for now
  * @param userId
  * @returns {Promise<object>}
  */
@@ -324,10 +329,24 @@ const getAllInBets = async (userId, limit) => {
     type: notificationEvents.EVENT_BET_PLACED,
     userId: userId,
     $expr: {
-      $eq: ['$data.trade.investmentAmount', '$data.user.balance']
+      $eq: [{
+        $convert: {
+          input: "$data.trade.investmentAmount",
+          to: "int",
+          onError: "An error occurred during conversion investmentAmount",
+          onNull: "investmentAmount was null or empty"
+        }
+      }, {
+        $convert: {
+          input: "$data.user.balance",
+          to: "int",
+          onError: "An error occurred during conversion balance",
+          onNull: "balance was null or empty"
+        }
+      }]
     }
   }, null, {
-    sort: { 'createdAt': -1 },
+    sort: {'createdAt': -1},
     limit
   })
 };
