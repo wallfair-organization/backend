@@ -199,7 +199,7 @@ exports.updateUser = async (userId, updatedUser) => {
           type: 'AVATAR_UPLOADED',
           award: WFAIR_REWARDS.uploadPicture
         }
-      }).catch((err)=> {
+      }).catch((err) => {
         console.error('createUserAwardEvent', err)
       })
     }
@@ -310,20 +310,21 @@ exports.updateStatus = async (userId, status) => {
  * @param userId
  * @returns {Promise<void>} undefined
  */
-exports.createUserAwardEvent = async ({userId, awardData, broadcast = false}) => {
+exports.createUserAwardEvent = async ({ userId, awardData, broadcast = false }) => {
   //add token amount for award during event creation
-  if(awardData?.award) {
-    await this.mintUser(userId, awardData.award).catch((err)=> {
+  if (awardData?.award) {
+    await this.mintUser(userId, awardData.award).catch((err) => {
       console.error('award mintUser', err)
     })
   }
 
-  publishEvent(notificationEvents.EVENT_USER_AWARD, {
+  amqp.send('universal_events', 'event.user_award', JSON.stringify({
+    event: notificationEvents.EVENT_USER_AWARD,
     producer: 'user',
     producerId: userId,
     data: awardData,
     broadcast
-  });
+  }));
 }
 
 /***
@@ -336,12 +337,12 @@ exports.checkTotalBetsAward = async (userId) => {
     type: 'TOTAL_BETS_ABOVE_VALUE'
   };
 
-  const totalUserBets = await getUserBetsAmount(userId).catch((err)=> {
+  const totalUserBets = await getUserBetsAmount(userId).catch((err) => {
     console.error('getUserBetsAmount', err)
   });
 
   const total = awardData.total = totalUserBets?.totalBets || 0;
-  if([5, 20, 50, 100, 150].includes(total)) {
+  if ([5, 20, 50, 100, 150].includes(total)) {
     awardData.award = WFAIR_REWARDS.totalBets[total];
     awardData.total = total;
 
@@ -349,7 +350,7 @@ exports.checkTotalBetsAward = async (userId) => {
     await this.createUserAwardEvent({
       userId,
       awardData
-    }).catch((err)=> {
+    }).catch((err) => {
       console.error('createUserAwardEvent', err)
     })
   }
