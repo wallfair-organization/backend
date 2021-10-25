@@ -5,7 +5,6 @@ const { ErrorHandler } = require('../util/error-handler');
 const authService = require('../services/auth-service');
 const { validationResult } = require('express-validator');
 const userService = require('../services/user-service');
-const auth0Service = require('../services/auth0-service');
 const mailService = require('../services/mail-service');
 const { generate } = require('../helper');
 const bcrypt = require('bcryptjs');
@@ -45,20 +44,6 @@ module.exports = {
       const counter = ((await userApi.getUserEntriesAmount()) || 0) + 1;
       const passwordHash = await bcrypt.hash(password, 8);
 
-      // create auth0 user
-      const auth0User = auth0Service.createUser(wFairUserId, {
-        email,
-        username: username || `wallfair-${counter}`,
-        password,
-        app_metadata: {},
-        user_metadata: {
-          // this reflects our own user mongoDB user Id
-          appId: wFairUserId,
-        },
-      });
-
-      if (!auth0User) throw new Error("Couldn't create auth0 user")
-
       const emailCode = generate(6);
 
       const createdUser = await userApi.createUser({
@@ -70,7 +55,6 @@ module.exports = {
         preferences: {
           currency: 'WFAIR',
         },
-        auth0Id: auth0User.user_id,
         ref
       });
 
@@ -82,11 +66,32 @@ module.exports = {
       if (ref) {
         if (INFLUENCERS.indexOf(ref) > -1) {
           console.debug('[REWARD BY INFLUENCER] ', ref);
-          await userService.rewardUserAction(createdUser.id.toString(), WFAIR_REWARDS.registeredByInfluencer);
+
+          await userService.createUserAwardEvent({
+            userId: createdUser.id.toString(),
+            awardData: {
+              type: 'CREATED_ACCOUNT_BY_INFLUENCER',
+              award: WFAIR_REWARDS.registeredByInfluencer,
+              ref
+            }
+          }).catch((err)=> {
+            console.error('createUserAwardEvent', err)
+          })
+
           initialReward += WFAIR_REWARDS.registeredByInfluencer;
         } else {
           console.debug('[REWARD BY USER] ', ref);
-          await userService.rewardUserAction(ref, WFAIR_REWARDS.referral);
+
+          await userService.createUserAwardEvent({
+            userId: ref,
+            awardData: {
+              type: 'CREATED_ACCOUNT_BY_THIS_REF',
+              award: WFAIR_REWARDS.referral,
+              ref
+            }
+          }).catch((err)=> {
+            console.error('createUserAwardEvent', err)
+          })
         }
       }
 

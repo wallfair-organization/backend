@@ -23,6 +23,13 @@ let mongoURL = process.env.DB_CONNECTION;
 const corsOptions = {
   origin: '*',
   credentials: true,
+  allowedMethods: [
+    'GET',
+    'PUT',
+    'POST',
+    'PATCH',
+    'DELETE',
+  ],
   allowedHeaders: [
     'Origin',
     'X-Requested-With',

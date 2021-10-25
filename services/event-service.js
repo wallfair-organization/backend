@@ -8,6 +8,8 @@ const { notificationEvents } = require('@wallfair.io/wallfair-commons/constants/
 const amqp = require('./amqp-service');
 const { onNewBet } = require('./quote-storage-service');
 const mongoose = require('mongoose');
+const { DEFAULT } = require('../util/constants');
+const outcomesUtil = require('../util/outcomes');
 
 const WFAIR = new Erc20('WFAIR');
 
@@ -194,16 +196,21 @@ exports.betCreated = async (bet, user) => {
   }
 };
 
-exports.provideLiquidityToBet = async (createBet) => {
+exports.provideLiquidityToBet = async (createBet, probabilityDistribution, liquidityAmount = DEFAULT.betLiquidity) => {
   const LOG_TAG = '[CREATE-BET]';
-  const liquidityAmount = 50_0000n; // bets start with 50 liquidity
   const liquidityProviderWallet = `LIQUIDITY_${createBet.id}`;
   const betContract = new BetContract(createBet.id, createBet.outcomes.length);
+  const liquidity = BigInt(liquidityAmount) * WFAIR.ONE;
+  const outcomeBalanceDistribution = outcomesUtil.getOutcomeBalancesByProbability(liquidity, probabilityDistribution);
 
   console.debug(LOG_TAG, 'Minting new Tokens');
-  await WFAIR.mint(liquidityProviderWallet, liquidityAmount * WFAIR.ONE);
+  await WFAIR.mint(liquidityProviderWallet, liquidity);
   console.debug(LOG_TAG, 'Adding Liquidity to the Event');
-  await betContract.addLiquidity(liquidityProviderWallet, liquidityAmount * WFAIR.ONE);
+  await betContract.addLiquidity(
+    liquidityProviderWallet,
+    liquidity,
+    outcomeBalanceDistribution,
+  );
 };
 
 exports.saveEvent = async (event, session, existing = false) => {
