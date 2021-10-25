@@ -10,6 +10,7 @@ const { updateUserData } = require('./notification-events-service');
 const { getUserBetsAmount } = require('./statistics-service');
 const awsS3Service = require('./aws-s3-service');
 const _ = require('lodash');
+const statsService = require("./statistics-service");
 
 const WFAIR = new Erc20('WFAIR');
 const CURRENCIES = ['WFAIR', 'EUR', 'USD'];
@@ -399,6 +400,32 @@ exports.checkBetsMaxStakeInRow = async (userId, timesInRow) => {
         console.error('createUserAwardEvent', err)
       })
     }
+  }
+}
+
+/***
+ * check total bets by category award, currently only SICK_SOCIETY, but we can reuse it for any category later on
+ * @param userId
+ * @returns {Promise<void>} undefined
+ */
+exports.checkTotalBetsInCategoryAward = async (userId, eventCategory, getAwardWhen = 10) => {
+  const awardData = {
+    type: 'TOTAL_BETS_IN_SICK_SOCIETY',
+    group: 'easter_egg'
+  };
+
+  const sickSocietyBets = await statsService.getBetsByCategory(userId, eventCategory);
+
+  if(sickSocietyBets.length === getAwardWhen-1) {
+    awardData.award = WFAIR_REWARDS.easterEggs['betsInSickSociety'];
+    awardData.totalBets = getAwardWhen;
+
+    await this.createUserAwardEvent({
+      userId,
+      awardData
+    }).catch((err)=> {
+      console.error('createUserAwardEvent', err)
+    })
   }
 }
 

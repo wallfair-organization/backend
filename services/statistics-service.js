@@ -351,6 +351,19 @@ const getAllInBets = async (userId, limit) => {
   })
 };
 
+/***
+ * Get get all bets by category for defined userId
+ * @param userId
+ * @returns {Promise<object>}
+ */
+const getBetsByCategory = async (userId, category) => {
+  return UniversalEvent.find({
+    type: notificationEvents.EVENT_BET_PLACED,
+    userId: userId,
+    'data.event.category': category
+  })
+};
+
 
 module.exports = {
   getCasinoGamePlayCount,
@@ -361,5 +374,6 @@ module.exports = {
   getUserBetsCashouts,
   getUserBetsRewards,
   getUserStats,
-  getAllInBets
+  getAllInBets,
+  getBetsByCategory
 };

@@ -142,10 +142,16 @@ exports.placeBet = async (userId, betId, amount, outcome, minOutcomeTokens) => {
       broadcast: true
     }
 
-    //check for user award max stake in a row, 5 in a row
+    //check for user award: max stake in a row (5)
     //ignore decimals during check
     if(Math.floor(eventPayload.data.user.balance) === Math.floor(eventPayload?.data.trade.investmentAmount)) {
       await userService.checkBetsMaxStakeInRow(userId, 5);
+    }
+
+    //check for user award: place x bets in sick-society category
+    const eventCategory = eventPayload.data.event?.category;
+    if(eventCategory.toLowerCase() === 'sick society') {
+      await userService.checkTotalBetsInCategoryAward(userId, eventCategory, 10);
     }
 
     publishEvent(notificationEvents.EVENT_BET_PLACED, eventPayload);
