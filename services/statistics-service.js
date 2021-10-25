@@ -1,4 +1,5 @@
 const {UniversalEvent} = require('@wallfair.io/wallfair-commons').models;
+const {notificationEvents} = require('../services/notification-service');
 const _ = require('lodash');
 
 /***
@@ -313,6 +314,25 @@ const getUserStats = async (userId) => {
   }
 };
 
+/***
+ * Get getAllInBets
+ * @param userId
+ * @returns {Promise<object>}
+ */
+const getAllInBets = async (userId, limit) => {
+  return UniversalEvent.find({
+    type: notificationEvents.EVENT_BET_PLACED,
+    userId: userId,
+    $expr: {
+      $eq: ['$data.trade.investmentAmount', '$data.user.balance']
+    }
+  }, null, {
+    sort: { 'createdAt': -1 },
+    limit
+  })
+};
+
+
 module.exports = {
   getCasinoGamePlayCount,
   getCasinoGameCashoutCount,
@@ -321,5 +341,6 @@ module.exports = {
   getUserBetsAmount,
   getUserBetsCashouts,
   getUserBetsRewards,
-  getUserStats
+  getUserStats,
+  getAllInBets
 };

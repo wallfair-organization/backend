@@ -1,4 +1,5 @@
 const userService = require('./user-service');
+const statsService = require('./statistics-service');
 const tradeService = require('./trade-service');
 const eventService = require('./event-service');
 const websocketService = require('./websocket-service');
@@ -104,6 +105,8 @@ exports.placeBet = async (userId, betId, amount, outcome, minOutcomeTokens) => {
 
   const session = await Bet.startSession();
   try {
+    const balance = await userService.getBalanceOf(userId);
+
     await session.withTransaction(async () => {
       const betContract = new BetContract(betId, bet.outcomes.length);
 
@@ -128,12 +131,24 @@ exports.placeBet = async (userId, betId, amount, outcome, minOutcomeTokens) => {
 
     await eventService.placeBet(user, bet, fromScaledBigInt(amount), outcome);
 
-    publishEvent(notificationEvents.EVENT_BET_PLACED, {
+    const eventPayload = {
       producer: 'user',
       producerId: userId,
-      data: { bet, trade: response.trade, user, event },
+      data: { bet, trade: response.trade,
+        user: {
+          ...user.toObject(),
+          balance: Math.floor(balance*100)/100,
+        }, event },
       broadcast: true
-    });
+    }
+
+    //check for user award max stake in a row, 5 in a row
+    //ignore decimals during check
+    if(Math.floor(eventPayload.data.user.balance) === Math.floor(eventPayload?.data.trade.investmentAmount)) {
+      await userService.checkBetsMaxStakeInRow(userId, 5);
+    }
+
+    publishEvent(notificationEvents.EVENT_BET_PLACED, eventPayload);
     return response;
   } catch (err) {
     console.error(LOG_TAG, err);

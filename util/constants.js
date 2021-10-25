@@ -10,6 +10,10 @@ const WFAIR_REWARDS = {
     50: 300,
     100: 500,
     150: 1000
+  },
+  easterEggs: {
+    betsMaxStakeInRow: 500,
+    elonGame200Played: 500
   }
 };
 

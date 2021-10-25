@@ -362,6 +362,47 @@ exports.checkTotalBetsAward = async (userId) => {
 }
 
 /***
+ * check total bets for user and save USER_AWARD event, after reaching each levels
+ * @param userId
+ * @returns {Promise<void>} undefined
+ */
+exports.checkBetsMaxStakeInRow = async (userId, timesInRow) => {
+  const awardData = {
+    type: 'MAX_STAKE_IN_A_ROW',
+    group: 'easter_egg',
+    timesInRow
+  };
+
+  const lastUserBets = await this.getLastBets(userId, timesInRow-1).catch((err)=> {
+    console.error('getLastAllInBets err', err)
+    return [];
+  });
+
+  const allInBets = lastUserBets.filter((el)=> {
+    return Math.floor(el?.data.user.balance) === Math.floor(el?.data.trade.investmentAmount);
+  })
+
+  if(allInBets.length === timesInRow-1) {
+    awardData.award = WFAIR_REWARDS.easterEggs['betsMaxStakeInRow'];
+    awardData.timesInRow = timesInRow;
+
+    const checkAwardExist = await this.checkAwardExist(userId, awardData.type).catch((err)=> {
+      console.error('checkAwardExist err', err);
+    })
+
+    if(checkAwardExist.length === 0) {
+      //publish in universalevents collection and add tokens
+      await this.createUserAwardEvent({
+        userId,
+        awardData
+      }).catch((err)=> {
+        console.error('createUserAwardEvent', err)
+      })
+    }
+  }
+}
+
+/***
  * check award exist for username and defined type
  * @param userId
  * @returns {Promise<void>} undefined
@@ -372,3 +413,19 @@ exports.checkAwardExist = async (userId, type) => {
     'data.type': type
   });
 }
+
+
+/***
+ * Get last n bets from user
+ * @param userId
+ * @returns {Promise<object>}
+ */
+exports.getLastBets = async (userId, limit) => {
+  return UniversalEvent.find({
+    type: notificationEvents.EVENT_BET_PLACED,
+    userId: userId
+  }, null, {
+    sort: { 'createdAt': -1 },
+    limit
+  });
+};
