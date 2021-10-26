@@ -15,7 +15,6 @@ const wallfair = require('@wallfair.io/wallfair-commons');
 const { handleError } = require('./util/error-handler');
 const jwt = require('jsonwebtoken');
 const logger = require('./util/logger');
-const { checkJwt } = require('./services/auth0-service');
 
 /**
  * CORS options
@@ -167,11 +166,11 @@ async function main() {
 
   // Using Routes
   server.use('/api/event', eventRoutes);
-  server.use('/api/event', checkJwt, secureEventRoutes);
+  server.use('/api/event', passport.authenticate('jwt', { session: false }), secureEventRoutes);
   server.use('/api/user', userRoute);
-  server.use('/api/user', checkJwt, secureUserRoute);
-  server.use('/api/rewards', checkJwt, secureRewardsRoutes);
-  server.use('/api/bet-template', checkJwt, secureBetTemplateRoute);
+  server.use('/api/user', passport.authenticate('jwt', { session: false }), secureUserRoute);
+  server.use('/api/rewards', passport.authenticate('jwt', { session: false }), secureRewardsRoutes);
+  server.use('/api/bet-template', passport.authenticate('jwt', { session: false }), secureBetTemplateRoute);
   server.use('/webhooks/twitch/', twitchWebhook);
   server.use('/api/chat', chatRoutes);
   server.use('/api/notification-events', notificationEventsRoutes);
@@ -186,10 +185,11 @@ async function main() {
   io.use((socket, next) => {
     let userId;
 
-    try {
-      const token = jwt.verify(socket.handshake.query.token, process.env.JWT_KEY);
-      userId = token.userId;
-    } catch (e) {
+    const token = jwt.decode(socket.handshake.query.token);
+
+    if (token) {
+      userId = token[`${process.env.AUTH0_AUDIENCE}/userId`];
+    } else {
       console.debug('[SOCKET] Non-logged in user connected');
     }
 
