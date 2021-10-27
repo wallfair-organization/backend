@@ -8,6 +8,7 @@ const {
   AUTH0_CLIENT_ID,
   AUTH0_CLIENT_SECRET,
   AUTH0_AUDIENCE,
+  AUTH0_CONNECTION_ID,
   CLIENT_URL
 } = process.env
 
@@ -18,16 +19,11 @@ if (!AUTH0_AUDIENCE) throw new Error("AUTH0_AUDIENCE isn't defined")
 /*
  * This is completely intended for internal use and not to be exposed via route or similar.
  */
-
-const clientConfig = {
+const managementClient = new ManagementClient({
   domain: AUTH0_DOMAIN,
   clientId: AUTH0_CLIENT_ID,
   clientSecret: AUTH0_CLIENT_SECRET,
-};
-
-const managementClient = new ManagementClient({
-  ...clientConfig,
-  audience: AUTH0_AUDIENCE,
+  audience: `https://${AUTH0_DOMAIN}/api/v2/`,
 });
 exports.managementClient = managementClient;
 
@@ -70,7 +66,7 @@ exports.updateUser = async function changePassword(auth0UserId, newPassword) {
  */
 exports.createUser = async function (wfairUserId, userData) {
   return await managementClient.createUser({
-    connection: process.env.AUTH0_CONNECTION_ID,
+    connection: AUTH0_CONNECTION_ID,
     email: userData.email,
     password: userData.password,
     // we set this to true to not trigger an Auth0 email. Surely it can be disabled in the Auth0 backend
