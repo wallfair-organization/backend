@@ -116,5 +116,11 @@ exports.checkJwt = jwt({
   algorithms: ['RS256'],
 });
 
+exports.importUsers = async (users, connection_id) =>
+  await managementClient.jobs.importUsersJob({
+    connection_id,
+    users_json: JSON.stringify(users),
+  });
+
 // TODO @gmussi Do you want to work with Auth0 scopes?
 exports.checkScopes = jwtAuthz(['read:messages']);

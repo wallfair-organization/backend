@@ -3,10 +3,7 @@ dotenv.config();
 const logger = require('../util/logger')
 const mongoose = require('mongoose');
 const wallfair = require('@wallfair.io/wallfair-commons');
-const { createUser } = require('../services/auth0-service');
-const { updateUser } = require('../services/user-service');
-const { User } = require('@wallfair.io/wallfair-commons').models;
-
+const { importUsers } = require('../services/auth0-service');
 
 async function connectMongoDB() {
   const connection = await mongoose.connect(process.env.DB_CONNECTION, {
@@ -26,34 +23,45 @@ async function connectMongoDB() {
 }
 
 const doMigration = async () => {
-  // get all users
-  const users = await User.find({}).exec();
+  const args = process.argv.slice(2);
+  if (!args.length || !args[0].startsWith('con_')) {
+    throw new Error('Missing connection id argument');
+  }
+
+  await connectMongoDB();
+
+  const connectionId = args[0];
+  const users = await wallfair.models.User.find(
+    { password: { $exists: true } },
+    {
+      email: "$email",
+      name: "$name",
+      nickname: "$username",
+      email_verified: { $literal: true },
+      custom_password_hash: {
+        algorithm: "bcrypt",
+        hash: {
+          value: "$password"
+        }
+      },
+      user_metadata: {
+        wfairUserId: { $toString: "$_id" }
+      }
+    }
+  ).select({ _id: 0 });
+
   if (!users || !users.length) throw new Error('No users found!')
 
-  // acutal migration
-  await Promise.all(
-    users.map(async user => {
-      const auth0User = await createUser(user.id, {
-        email: user.email,
-        password: user.password,
-      });
-
-      return updateUser(user.id, {
-        auth0Id: auth0User.user_id
-      })
-    })
-  )
+  const response = await importUsers(users, connectionId);
+  console.log("Import done", response);
 }
 
 (async () => {
   try {
-    // waterfall to make sure everythings there
-    await [
-      connectMongoDB,
-      doMigration,
-    ].reduce((p, f) => p.then(f), Promise.resolve());
-
-  } catch (err) {
-    logger.error(err)
+    await doMigration();
+  } catch (e) {
+    console.error('Migration script failed: ', e.message);
+  } finally {
+    process.exit();
   }
-})()
+})();
