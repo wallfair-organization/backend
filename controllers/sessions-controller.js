@@ -53,7 +53,6 @@ module.exports = {
           appId: wFairUserId,
         },
       });
-      logger.info("Created auth0User")
 
       if (!auth0User) {
         return next(new ErrorHandler(500, "Couldn't create auth0 user"));
@@ -70,7 +69,7 @@ module.exports = {
         },
         ref
       });
-      logger.info("Created WFair user")
+
       if (!createdUser) {
         return next(new ErrorHandler(500, "Couldn't create WFAIR user"));
       }
