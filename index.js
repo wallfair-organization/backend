@@ -188,7 +188,7 @@ async function main() {
     const token = jwt.decode(socket.handshake.query.token);
 
     if (token) {
-      userId = token[`${process.env.AUTH0_AUDIENCE}/userId`];
+      userId = token[`${process.env.AUTH0_AUDIENCE}userId`];
     } else {
       console.debug('[SOCKET] Non-logged in user connected');
     }
