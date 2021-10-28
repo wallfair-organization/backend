@@ -42,6 +42,8 @@ exports.createPasswordChangeTicket = async (auth0UserId) => await managementClie
     user_id: auth0UserId,
   });
 
+exports.getUser = async (userId) => await managementClient.getUser({ id: userId });
+
 /**
  * Updates as users password at auth0
  * @param {String} auth0UserId
@@ -120,6 +122,12 @@ exports.importUsers = async (users, connection_id) =>
   await managementClient.jobs.importUsersJob({
     connection_id,
     users_json: JSON.stringify(users),
+  });
+
+exports.linkUsers = async (existingUserId, userId) =>
+  await managementClient.linkUsers(existingUserId, {
+    user_id: userId,
+    provider: userId.split('|')[0],
   });
 
 // TODO @gmussi Do you want to work with Auth0 scopes?

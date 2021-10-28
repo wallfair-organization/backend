@@ -53,7 +53,7 @@ module.exports = {
           appId: wFairUserId,
         },
       });
-      logger.info("Created auth0User", auth0User)
+      logger.info("Created auth0User")
 
       if (!auth0User) {
         return next(new ErrorHandler(500, "Couldn't create auth0 user"));
@@ -70,7 +70,7 @@ module.exports = {
         },
         ref
       });
-      logger.info("Created WFair user", createdUser)
+      logger.info("Created WFair user")
       if (!createdUser) {
         return next(new ErrorHandler(500, "Couldn't create WFAIR user"));
       }
@@ -152,12 +152,14 @@ module.exports = {
 
       if (!user) {
         newUser = true;
+        const auth0User = await auth0Service.getUser(userIdentifier);
         const counter = ((await userApi.getUserEntriesAmount()) || 0) + 1;
         const emailCode = generate(6);
         user = await userApi.createUser({
           email,
           emailCode,
           username: `wallfair-${counter}`,
+          profilePicture: auth0User.picture,
           preferences: {
             currency: 'WFAIR',
           },
@@ -172,6 +174,10 @@ module.exports = {
         user.auth0Id = userIdentifier;
         await user.save();
         await auth0Service.updateUserMetadata(userIdentifier, { wfairUserId: user.id });
+      }
+
+      if (user && user.auth0Id !== userIdentifier) {
+        await auth0Service.linkUsers(user.auth0Id, userIdentifier);
       }
 
       if (user.status === 'locked') {
