@@ -148,6 +148,7 @@ module.exports = {
     try {
       const { userIdentifier, email } = req.body;
       let newUser = false;
+      let userLinked = false;
       let user = await userApi.getByAuth0IdOrEmail(userIdentifier, email);
 
       if (!user) {
@@ -178,6 +179,7 @@ module.exports = {
 
       if (user && user.auth0Id !== userIdentifier) {
         await auth0Service.linkUsers(user.auth0Id, userIdentifier);
+        userLinked = true;
       }
 
       if (user.status === 'locked') {
@@ -199,6 +201,7 @@ module.exports = {
       res.status(200).json({
         userId: user._id.toString(),
         newUser,
+        userLinked,
       });
     } catch (err) {
       logger.error(err);
