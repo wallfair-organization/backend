@@ -50,7 +50,7 @@ exports.getUser = async (userId) => await managementClient.getUser({ id: userId 
  * @param {String} newPassword
  * @returns Auth0 user
  */
-exports.updateUser = async function changePassword(auth0UserId, newPassword) {
+exports.changePassword = async (auth0UserId, newPassword) => {
   // @gmussi Do we need to trigger an event here?
   return managementClient.updateUser({ id: auth0UserId }, { password: newPassword })
 }

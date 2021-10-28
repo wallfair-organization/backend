@@ -241,7 +241,8 @@ module.exports = {
         return next(new ErrorHandler(401, "Passwords do not match"));
       }
 
-      user.password = await bcrypt.hash(req.body.password, 8);
+      await auth0Service.changePassword(user.auth0Id, req.body.password);
+
       user.passwordResetToken = undefined;
       await user.save();
 
