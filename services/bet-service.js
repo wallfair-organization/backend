@@ -1,5 +1,4 @@
 const userService = require('./user-service');
-const statsService = require('./statistics-service');
 const tradeService = require('./trade-service');
 const eventService = require('./event-service');
 const websocketService = require('./websocket-service');
