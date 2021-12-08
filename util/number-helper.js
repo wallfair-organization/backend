@@ -1,14 +1,13 @@
 const _ = require("lodash");
 
-const BigNumber = require('bignumber.js');
-const { ONE } = require('@wallfair.io/trading-engine');
+const { ONE, BN } = require('@wallfair.io/trading-engine');
 
 const toScaledBigInt = (input) => {
   return BigInt(input) * ONE;
 };
 
 const fromScaledBigInt = (input) => {
-  return new BigNumber(input).dividedBy(ONE).toFixed(4);
+  return new BN(input).dividedBy(ONE).toFixed(4);
 };
 
 const calculateGain = (investmentAmount, outcomeAmount, precision = 2) => {
