@@ -19,6 +19,7 @@ const { fromScaledBigInt, toScaledBigInt } = require('../util/number-helper');
 
 const _ = require('lodash');
 const bigDecimal = require('js-big-decimal');
+const faker = require('faker');
 
 const WFAIR = new Wallet();
 const WFAIR_TOKEN = 'WFAIR';
@@ -613,6 +614,12 @@ const getUserTransactions = async (req, res, next) => {
   }
 }
 
+function randomUsername(req, res) {
+  const username = faker.internet.userName();
+  return res.send({username})
+}
+
+
 exports.bindWalletAddress = bindWalletAddress;
 exports.saveAdditionalInformation = saveAdditionalInformation;
 exports.saveAcceptConditions = saveAcceptConditions;
@@ -632,3 +639,4 @@ exports.getUserStats = getUserStats;
 exports.getUserCount = getUserCount;
 exports.updateStatus = updateStatus;
 exports.getUserTransactions = getUserTransactions;
+exports.randomUsername = randomUsername;

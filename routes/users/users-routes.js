@@ -23,4 +23,6 @@ router.get('/:userId/stats', userController.getUserStats);
 
 router.get('/count', userController.getUserCount)
 
+router.get('/random-username', userController.randomUsername)
+
 module.exports = router;
