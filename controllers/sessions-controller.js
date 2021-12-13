@@ -43,8 +43,11 @@ module.exports = {
           );
         }
       }
+      const counter = ((await userApi.getUserEntriesAmount()) || 0) + 1;
 
-      const existing = await userApi.getUserByIdEmailPhoneOrUsername(email);
+      const potentialUsername = username || `wallfair-${counter}`;
+
+      const existing = await userApi.getUserByEmailOrUsername(email, potentialUsername);
 
       if (existing) {
         return next(
@@ -54,14 +57,13 @@ module.exports = {
 
       // init data
       const wFairUserId = new ObjectId().toHexString();
-      const counter = ((await userApi.getUserEntriesAmount()) || 0) + 1;
       const passwordHash = await bcrypt.hash(password, 8);
       const emailCode = generate(6);
       const createdUser = await userApi.createUser({
         _id: wFairUserId,
         email,
         emailCode,
-        username: username || `wallfair-${counter}`,
+        username: potentialUsername,
         password: passwordHash,
         preferences: {
           currency: 'WFAIR',
@@ -162,7 +164,7 @@ module.exports = {
       const { ref = null } = req.body;
 
       const userData = await authService.getUserDataForProvider(provider, req.body);
-      const existingUser = await userApi.getUserByIdEmailPhoneOrUsername(userData.email);
+      const existingUser = await userApi.getUserByEmailOrUsername(userData.email);
 
       if (existingUser) { // if exists, log user in
         amqp.send('universal_events', 'event.user_signed_in', JSON.stringify({
@@ -240,7 +242,7 @@ module.exports = {
 
     try {
       const { userIdentifier, password } = req.body;
-      const user = await userApi.getUserByIdEmailPhoneOrUsername(userIdentifier);
+      const user = await userApi.getUserByEmailOrUsername(userIdentifier);
 
       if (!user) {
         console.log('ERROR ', 'User not found upon login!', req.body);
@@ -294,7 +296,7 @@ module.exports = {
   async resetPassword(req, res, next) {
     try {
       // get user
-      const user = await userApi.getUserByIdEmailPhoneOrUsername(req.body.email);
+      const user = await userApi.getUserByEmailOrUsername(req.body.email);
       if (!user) return next(new ErrorHandler(404, "Couldn't find user"));
 
       // check if token matches
@@ -336,7 +338,7 @@ module.exports = {
   /** Hanlder to init the "I've forgot my passwort" process */
   async forgotPassword(req, res, next) {
     try {
-      const user = await userApi.getUserByIdEmailPhoneOrUsername(req.body.email);
+      const user = await userApi.getUserByEmailOrUsername(req.body.email);
       if (!user) {
         console.log('ERROR', 'Forgot password: User not found ', req.body);
         return next(new ErrorHandler(404, "Couldn't find user"));

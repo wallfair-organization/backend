@@ -38,13 +38,16 @@ const updateUser = async (userData) => await User.findOneAndUpdate({
 /** @param {String} userId */
 const getOne = (userId) => User.findOne({ _id: userId }).exec();
 
-/** @param {String} IdEmailPhoneOrUsername */
-const getUserByIdEmailPhoneOrUsername = (IdEmailPhoneOrUsername) => User
+/**
+ * @param {String} email
+ * @param {String} username
+ *
+ * */
+const getUserByEmailOrUsername = (email, username) => User
   .findOne({
     $or: [
-      { username: IdEmailPhoneOrUsername },
-      { phone: IdEmailPhoneOrUsername },
-      { email: IdEmailPhoneOrUsername },
+      { username: username },
+      { email: email },
     ],
   })
   .exec();
@@ -63,7 +66,7 @@ module.exports = {
   createUser,
   updateUser,
   getOne,
-  getUserByIdEmailPhoneOrUsername,
+  getUserByEmailOrUsername,
   verifyEmail,
   getUserEntriesAmount,
 };
