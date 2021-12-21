@@ -22,7 +22,7 @@ module.exports = {
     }
 
     try {
-      const { password, email, username, ref, recaptchaToken } = req.body;
+      const { password, email, username, ref, recaptchaToken, cid, sid } = req.body;
       const { skip } = req.query;
       if (!process.env.RECAPTCHA_SKIP_TOKEN || process.env.RECAPTCHA_SKIP_TOKEN !== skip) {
         const recaptchaRes = await axios.post(
@@ -69,6 +69,8 @@ module.exports = {
         },
         ref,
         tosConsentedAt: new Date(),
+        sid,
+        cid,
       });
 
       const account = new TransactionManager().account;
@@ -132,6 +134,8 @@ module.exports = {
             ref,
             initialReward,
             updatedAt: Date.now(),
+            cid,
+            sid,
           },
           date: Date.now(),
           broadcast: true,
@@ -166,7 +170,11 @@ module.exports = {
 
     try {
       const { provider } = req.params;
-      const { ref = null } = req.body;
+      const {
+        ref = null,
+        sid = null,
+        cid = null
+      } = req.body;
 
       const userData = await authService.getUserDataForProvider(provider, req.body);
 
@@ -214,6 +222,8 @@ module.exports = {
             currency: 'WFAIR',
           },
           ref,
+          sid,
+          cid,
         });
 
         const initialReward = 0;
