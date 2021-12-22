@@ -11,8 +11,7 @@ const amqp = require('./amqp-service');
 const { getUserBetsAmount } = require('./statistics-service');
 const awsS3Service = require('./aws-s3-service');
 const _ = require('lodash');
-const {BONUS_STATES, BONUS_TYPES} = require('../util/constants');
-const mongoose = require("mongoose");
+const { BONUS_TYPES } = require('../util/constants');
 const walletUtil = require("../util/wallet");
 
 const WFAIR = new Wallet();
@@ -480,7 +479,7 @@ exports.checkUserRegistrationBonus = async (userId) => {
   const validUntil = new Date(bonusValidUntil);
 
   //skip check when bonus period is over
-  if(validUntil < now) {
+  if (validUntil < now) {
     return;
   }
 
@@ -488,7 +487,7 @@ exports.checkUserRegistrationBonus = async (userId) => {
 
   const alreadyRegistered = await User.find({
     'bonus.name': BONUS_TYPES.LAUNCH_1k_500.type
-  }, {_id: 1}, {
+  }, { _id: 1 }, {
     sort: {
       date: -1
     }
