@@ -7,6 +7,19 @@ const { check, oneOf } = require('express-validator');
 // Import User Controller
 const userController = require('../../controllers/users-controller');
 
+
+
+router.get(
+  '/',
+  [
+    check('sortOrder').isIn(['asc', 'desc']),
+    check('search').isString(),
+    check('page').isNumeric(),
+    check('limit').isNumeric(),
+  ],
+  userController.getAll
+);
+
 router.post(
   '/bindWalletAddress',
   [check('walletAddress').notEmpty()],

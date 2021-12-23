@@ -68,6 +68,26 @@ const bindWalletAddress = async (req, res, next) => {
   }
 };
 
+const getAll = async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return next(new ErrorHandler(400, errors[0]));
+  }
+  const {
+    search = '',
+    sortBy = 'date',
+    sortOrder = 'desc',
+    limit = 10,
+    page = 1,
+  } = req.query;
+  const users = await userService.getMany({
+    sortBy,
+    sortOrder,
+    limit,
+    skip: limit * page - 1
+  });
+}
+
 //@todo this route is not used in frontend, I will move ref reward part in confirm-email route
 const saveAdditionalInformation = async (req, res, next) => {
   // Validating User Inputs

@@ -20,6 +20,8 @@ exports.getUserByPhone = async (phone, session) => User.findOne({ phone }).sessi
 
 exports.getUserById = async (id, session) => User.findOne({ _id: id }).session(session);
 
+exports.getMany = async (filters, session) => User.findOne(filters).session(session);
+
 exports.getUserReducedDataById = async (id, session) =>
   User.findOne({ _id: id })
     .select({
