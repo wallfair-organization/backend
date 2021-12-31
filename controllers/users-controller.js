@@ -449,35 +449,41 @@ const confirmEmail = async (req, res, next) => {
     return next(res.status(400).send(errors));
   }
 
-  // Defining User Inputs
-  const { code, userId } = req.query;
+  try {
+    // Defining User Inputs
+    const { code, userId } = req.query;
 
-  const user = await userService.getUserById(userId);
+    const user = await userService.getUserById(userId);
 
-  if (user.emailConfirmed && user.confirmed) {
-    return res.status(200).send({ status: 'The email has been already confirmed' });
-  }
+    if (user.emailConfirmed && user.confirmed) {
+      return res.status(200).send({ status: 'The email has been already confirmed' });
+    }
 
-  if (user.emailCode === code) {
-    user.emailConfirmed = true;
-    user.confirmed = true;
-    await user.save();
+    if (user.emailCode === code) {
+      user.emailConfirmed = true;
+      user.confirmed = true;
+      await user.save();
 
-    // await userService
-    //   .createUserAwardEvent({
-    //     userId,
-    //     awardData: {
-    //       type: AWARD_TYPES.EMAIL_CONFIRMED,
-    //       award: WFAIR_REWARDS.confirmEmail,
-    //     },
-    //   })
-    //   .catch((err) => {
-    //     console.error('createUserAwardEvent', err);
-    //   });
+      // await userService
+      //   .createUserAwardEvent({
+      //     userId,
+      //     awardData: {
+      //       type: AWARD_TYPES.EMAIL_CONFIRMED,
+      //       award: WFAIR_REWARDS.confirmEmail,
+      //     },
+      //   })
+      //   .catch((err) => {
+      //     console.error('createUserAwardEvent', err);
+      //   });
 
-    res.status(200).send({ status: 'OK' });
-  } else {
-    next(new ErrorHandler(422, 'The email code is invalid'));
+      // await userService.checkConfirmEmailBonus(userId);
+
+      res.status(200).send({ status: 'OK' });
+    } else {
+      next(new ErrorHandler(422, 'The email code is invalid'));
+    }
+  } catch (err) {
+    next(new ErrorHandler(422, err.message));
   }
 };
 
@@ -728,6 +734,30 @@ async function addBonus(req, res, next) {
   }
 }
 
+async function checkBonus(req, res, next) {
+  try {
+    const { type } = req.params;
+
+    const output = {
+      totalUsers: 0,
+      bonusType: type
+    }
+
+    const bonusCfg = BONUS_TYPES?.[type];
+
+    if(!bonusCfg) {
+      throw new Error('Bonus type not found.');
+    }
+
+    output.totalUsers = await userService.getUsersCountByBonus(bonusCfg.type);
+
+    return res.send(output);
+  } catch (err) {
+    console.error(err);
+    next(new ErrorHandler(422, err.message));
+  }
+}
+
 function buyWithCrypto(req, res, next) {
   if (!req.user || !req.user.email) return next(new ErrorHandler(404, 'Email not found'));
   const { currency, wallet, amount, estimate } = req.body;
@@ -801,6 +831,27 @@ const banUser = async (req, res, next) => {
   }
 };
 
+async function refreshKycRoute(req, res, next) {
+  try {
+    const userId = req.user.id;
+
+    const userData = await userService.getUserById(userId);
+
+    const refreshToken = userData?.kyc?.refreshToken;
+
+    let output = {};
+
+    if(refreshToken) {
+      output = await kycService.refreshUserKyc(userId, refreshToken);
+    }
+
+    return res.send(output);
+  } catch (err) {
+    console.error(err);
+    next(new ErrorHandler(422, err.message));
+  }
+}
+
 exports.bindWalletAddress = bindWalletAddress;
 exports.saveAdditionalInformation = saveAdditionalInformation;
 exports.saveAcceptConditions = saveAcceptConditions;
@@ -829,3 +880,5 @@ exports.cryptoPayChannel = cryptoPayChannel;
 exports.updateUserConsent = updateUserConsent;
 exports.banUser = banUser;
 exports.addBonus = addBonus;
+exports.checkBonus = checkBonus;
+exports.refreshKycRoute = refreshKycRoute;

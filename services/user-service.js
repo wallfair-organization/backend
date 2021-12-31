@@ -3,16 +3,18 @@ const pick = require('lodash.pick');
 const bcrypt = require('bcrypt');
 const axios = require('axios');
 // const { BetContract } = require('@wallfair.io/smart_contract_mock');
-const { Wallet /*, ONE*/, fromWei } = require('@wallfair.io/trading-engine');
-const { WFAIR_REWARDS /*, AWARD_TYPES*/ } = require('../util/constants');
+const { Wallet /*, ONE*/, fromWei, Query } = require('@wallfair.io/trading-engine');
+const { WFAIR_REWARDS } = require('../util/constants');
 const { updateUserData } = require('./notification-events-service');
 const { notificationEvents } = require('@wallfair.io/wallfair-commons/constants/eventTypes');
 const amqp = require('./amqp-service');
 const { getUserBetsAmount } = require('./statistics-service');
 const awsS3Service = require('./aws-s3-service');
 const _ = require('lodash');
-const { BONUS_TYPES } = require('../util/constants');
+const {BONUS_TYPES} = require('../util/constants');
 const walletUtil = require("../util/wallet");
+const mongoose = require("mongoose");
+const {NotFoundError} = require('../util/error-handler')
 
 const WFAIR = new Wallet();
 // const WFAIR_TOKEN = 'WFAIR';
@@ -485,15 +487,133 @@ exports.checkUserRegistrationBonus = async (userId) => {
 
   const totalUsers = 1000;
 
+  const alreadyRegistered1k500 = await this.getUsersCountByBonus(BONUS_TYPES.LAUNCH_1k_500.type);
+
+  if (alreadyRegistered1k500 <= totalUsers) {
+    const alreadyHasBonus = await this.checkUserGotBonus(BONUS_TYPES.LAUNCH_1k_500.type, userId);
+    //just to make sure, bonus type entry not exist yet for the user
+    if(!alreadyHasBonus) {
+      await walletUtil.transferBonus(BONUS_TYPES.LAUNCH_1k_500, userId);
+    }
+  }
+
+  // second bonus check BONUS_TYPES.LAUNCH_2k_400
+  // check only when 1 reach 1000
+  // if(alreadyRegistered1k500 >= 1000) {
+  //   const alreadyRegistered2k400 = await this.getUsersCountByBonus(BONUS_TYPES.LAUNCH_2k_400.type);
+  //
+  //   if(alreadyRegistered2k400 <= 1000) {
+  //     await walletUtil.transferBonus(BONUS_TYPES.LAUNCH_2k_400, userId);
+  //   }
+  // }
+
+};
+
+exports.getUsersCountByBonus = async (bonusName)=> {
   const alreadyRegistered = await User.find({
-    'bonus.name': BONUS_TYPES.LAUNCH_1k_500.type
-  }, { _id: 1 }, {
+    'bonus.name': bonusName
+  }, {_id: 1}, {
     sort: {
       date: -1
     }
   });
 
-  if (alreadyRegistered.length <= totalUsers) {
-    await walletUtil.transferBonus(BONUS_TYPES.LAUNCH_1k_500.amount, userId);
+  return alreadyRegistered.length;
+}
+
+exports.checkUserGotBonus = async (bonusName, userId)=> {
+  const userData = await User.findOne({
+    'bonus.name': bonusName,
+    '_id': userId
+  }, {_id: 1});
+
+  return userData ? true : false;
+}
+
+/***
+ * check if user is eligible to get FIRST_DEPOSIT_450 bonus
+ * @param dd {object} DEPOSIT DATA
+ * @returns {Promise<void>} undefined
+ */
+exports.checkFirstDepositBonus = async (dd) => {
+  const userId = dd?.userId;
+  if(userId) {
+    const bonusCfg = _.cloneDeep(BONUS_TYPES.FIRST_DEPOSIT_DOUBLE_DEC21);
+    const alreadyHasBonus = await this.checkUserGotBonus(bonusCfg.type, userId);
+    const hasSpecialPromoFlag = await this.checkUserGotBonus(BONUS_TYPES.LAUNCH_PROMO_2021.type, userId);
+
+    if (!alreadyHasBonus && hasSpecialPromoFlag) {
+      const formattedAmount = fromWei(dd.amount).decimalPlaces(0).toNumber();
+      //the same amount as bonus
+      bonusCfg.amount = Math.min(formattedAmount, bonusCfg.max);
+
+      await walletUtil.transferBonus(bonusCfg, userId);
+    }
   }
 };
+
+/***
+ * check if user is eligible to get EMAIL_CONFIRM_50 bonus
+ * @param userId
+ * @returns {Promise<void>} undefined
+ */
+exports.checkConfirmEmailBonus = async (userId) => {
+  if(userId) {
+    const alreadyHasBonus = await this.checkUserGotBonus(BONUS_TYPES.EMAIL_CONFIRM_50.type, userId);
+    const hasSpecialPromoFlag = await this.checkUserGotBonus(BONUS_TYPES.LAUNCH_PROMO_2021.type, userId);
+
+    if (!alreadyHasBonus && hasSpecialPromoFlag) {
+      await walletUtil.transferBonus(BONUS_TYPES.EMAIL_CONFIRM_50, userId);
+    }
+  }
+};
+
+/***
+ * add special bonus flag only, without transfer
+ * @param userId
+ * @param bonusCfg
+ * @returns {Promise<void>} undefined
+ */
+exports.addBonusFlagOnly = async (userId, bonusCfg) => {
+  if(userId && bonusCfg) {
+    await User.updateOne({
+      _id: mongoose.Types.ObjectId(userId)
+    }, {
+      $push: {
+        bonus: {
+          name: bonusCfg.type
+        }
+      }
+    });
+  }
+};
+
+exports.getUserDataForAdmin = async (userId) => {
+  const queryRunner = new Query();
+  const one = 1000000000000000000
+  const u = await User.findOne({ _id: userId })
+  if(!u) throw new NotFoundError()
+  let KYCCount = 0
+    if(u.kyc.uid){
+      KYCCount = await User.count({"kyc.uid": u.kyc.uid})
+    }
+    const balance = await queryRunner
+      .query(
+        `select cast(balance / ${one} as integer) as "balance" from account where owner_account = '${userId}'`)
+
+    const bets = await queryRunner
+      .query(
+        `select cast(stakedamount / ${one} as integer) as "bet", crashfactor as "multiplier", cast(amountpaid/${one} as integer) as "cashout", cast((amountpaid - stakedamount) / ${one} as integer) as "profit", games.label from casino_trades left join games on games.id = casino_trades.gameid where userid = '${userId}' and state < 4 order by created_at;`)
+
+    const transactions = await queryRunner
+      .query(
+        `select created_at, cast(amount / ${one} as integer) as "amount", internal_user_id, originator, status from external_transaction_log where internal_user_id = '${userId}' order by created_at;`)
+
+    return {
+      ...u.toObject(),
+      KYCCount,
+      balance: (balance && balance.length) ? balance[0].balance : 0,
+      bets,
+      transactions
+    }
+}

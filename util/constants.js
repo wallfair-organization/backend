@@ -38,6 +38,23 @@ const BONUS_TYPES = {
     type: 'LAUNCH_1k_500',
     amount: 500,
     endDate: '12/31/2021 23:59:59'
+  },
+  LAUNCH_2k_400: {
+    type: 'LAUNCH_2k_400',
+    amount: 100
+  },
+  EMAIL_CONFIRM_50: {
+    type: 'EMAIL_CONFIRM_50',
+    amount: 50,
+    neededBonusType: 'LAUNCH_PROMO_2021'
+  },
+  FIRST_DEPOSIT_DOUBLE_DEC21: {
+    type: 'FIRST_DEPOSIT_DOUBLE_DEC21',
+    neededBonusType: 'LAUNCH_PROMO_2021',
+    max: 25_000
+  },
+  LAUNCH_PROMO_2021: {
+    type: 'LAUNCH_PROMO_2021'
   }
 }
 
