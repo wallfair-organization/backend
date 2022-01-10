@@ -11,6 +11,8 @@ spec:
           - configMapRef:
               name: backend-config
           - configMapRef:
+              name: app-secrets    
+          - configMapRef:
               name: postgres-conn
           - configMapRef:
               name: mongo-conn
