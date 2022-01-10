@@ -1,6 +1,5 @@
 resources:
   - backend-prod-deploy.yaml
-  - ingress-prod.yaml
 
 configMapGenerator:
   - name: backend-config

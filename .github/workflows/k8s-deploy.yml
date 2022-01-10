@@ -7,6 +7,7 @@ on:
       - main
       - production
       - development
+      - playmoney
 
 jobs:
   build_and_push:
@@ -28,9 +29,9 @@ jobs:
         run: doctl registry login
       - name: Build the docker image
         id: docker_build
-        run: docker build . -q -t registry.digitalocean.com/wallfair/backend_k8s:${GITHUB_SHA::6}
+        run: docker build . -q -t registry.digitalocean.com/wallfair/backend_playmoney:${GITHUB_SHA::6}
       - name: Publish the docker image to Digital Ocean
-        run: docker push registry.digitalocean.com/wallfair/backend_k8s:${GITHUB_SHA::6}
+        run: docker push registry.digitalocean.com/wallfair/backend_playmoney:${GITHUB_SHA::6}
   
   deploy:
     runs-on: ubuntu-latest
@@ -45,7 +46,7 @@ jobs:
           kustomize: 4.2.0
           command: |
             cd infra/environments/staging
-            kustomize edit set image registry.digitalocean.com/wallfair/backend_k8s:${GITHUB_SHA::6}
+            kustomize edit set image registry.digitalocean.com/wallfair/backend_playmoney:${GITHUB_SHA::6}
             kustomize build .
       - name: Edit deployment image (development)
         if: github.ref == 'refs/heads/development'
@@ -54,7 +55,7 @@ jobs:
           kustomize: 4.2.0
           command: |
             cd infra/environments/development
-            kustomize edit set image registry.digitalocean.com/wallfair/backend_k8s:${GITHUB_SHA::6}
+            kustomize edit set image registry.digitalocean.com/wallfair/backend_playmoney:${GITHUB_SHA::6}
             kustomize build .
       - name: Edit deployment image (production)
         if: github.ref == 'refs/heads/production'
@@ -63,7 +64,16 @@ jobs:
           kustomize: 4.2.0
           command: |
             cd infra/environments/production
-            kustomize edit set image registry.digitalocean.com/wallfair/backend_k8s:${GITHUB_SHA::6}
+            kustomize edit set image registry.digitalocean.com/wallfair/backend_playmoney:${GITHUB_SHA::6}
+            kustomize build .
+      - name: Edit deployment image (playmoney)
+        if: github.ref == 'refs/heads/playmoney'
+        uses: stefanprodan/kube-tools@v1
+        with:
+          kustomize: 4.2.0
+          command: |
+            cd infra/environments/playmoney
+            kustomize edit set image registry.digitalocean.com/wallfair/backend_playmoney:${GITHUB_SHA::6}
             kustomize build .
       - uses: actions-hub/kubectl@master
         if: github.ref == 'refs/heads/main'
@@ -83,3 +93,9 @@ jobs:
           KUBE_CONFIG: ${{ secrets.K8S_CONFIG_TEST }}
         with:
           args: apply -k infra/environments/production
+      - uses: actions-hub/kubectl@master
+        if: github.ref == 'refs/heads/playmoney'
+        env:
+          KUBE_CONFIG: ${{ secrets.K8S_CONFIG_TEST }}
+        with:
+          args: apply -k infra/environments/playmoney

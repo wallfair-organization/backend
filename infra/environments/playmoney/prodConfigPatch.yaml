@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  template:
+    spec:
+      containers:
+        - name: backend
+          envFrom:
+          - configMapRef:
+              name: backend-config
+          - configMapRef:
+              name: postgres-conn
+
