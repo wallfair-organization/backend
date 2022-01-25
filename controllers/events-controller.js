@@ -82,8 +82,6 @@ const getEvent = async (req, res, next) => {
 };
 
 const createEvent = async (req, res, next) => {
-  if (!isAdmin(req)) return next(new ErrorHandler(403, 'Action not allowed'));
-
   // Validating User Inputs
   const LOG_TAG = '[CREATE-EVENT]';
 
@@ -232,6 +230,7 @@ const editEvent = async (req, res, next) => {
 
 const deleteEvent = async (req, res, next) => {
   if (!isAdmin(req)) return next(new ErrorHandler(403, 'Action not allowed'));
+
   try {
     const { id } = req.params;
     const event = await eventService.getEvent(id);
