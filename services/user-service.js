@@ -1,6 +1,8 @@
 const { User, UniversalEvent, ApiLogs } = require('@wallfair.io/wallfair-commons').models;
 const pick = require('lodash.pick');
 const bcrypt = require('bcrypt');
+const { ErrorHandler } = require('../util/error-handler');
+const { validationResult } = require('express-validator');
 const axios = require('axios');
 const { Wallet, fromWei, Query, AccountNamespace, BN, Transactions } = require('@wallfair.io/trading-engine');
 const { WFAIR_REWARDS } = require('../util/constants');
@@ -13,7 +15,7 @@ const _ = require('lodash');
 const mongoose = require("mongoose");
 const { NotFoundError } = require('../util/error-handler')
 const { CasinoTradeContract } = require('@wallfair.io/wallfair-casino');
-
+const authService = require('../services/auth-service');
 const WFAIR = new Wallet();
 const casinoContract = new CasinoTradeContract();
 const CURRENCIES = ['WFAIR', 'EUR', 'USD'];
@@ -327,7 +329,7 @@ exports.updateUserPreferences = async (userId, preferences) => {
   let user = await User.findById(userId);
 
   if (preferences) {
-    if(preferences.currency) {
+    if (preferences.currency) {
       const valid = CURRENCIES.includes(preferences.currency);
       if (!valid) {
         throw new Error(`User validation failed. Invalid currency ${preferences.currency}`);
@@ -335,7 +337,7 @@ exports.updateUserPreferences = async (userId, preferences) => {
       user.preferences.currency = preferences.currency;
     }
 
-    if(preferences.gamesCurrency) {
+    if (preferences.gamesCurrency) {
       const valid = CURRENCIES.includes(preferences.gamesCurrency);
       if (!valid) {
         throw new Error(`User validation failed. Invalid currency ${preferences.gamesCurrency}`);
@@ -513,6 +515,56 @@ exports.searchUsers = async (limit, skip, search, sortField, sortOrder) => {
     count
   }
 }
+
+exports.login = async (req, res, next) => {
+  // Validating User Inputs
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return next(new ErrorHandler(422, 'Invalid phone number'));
+  }
+
+  // Defining User Inputs
+  const { phone, ref } = req.body;
+
+  try {
+    const response = await authService.doLogin(phone, ref);
+    res.status(201).json({
+      phone,
+      smsStatus: response.status,
+      existing: !!response.existing,
+    });
+  } catch (err) {
+    console.error(err);
+    next(new ErrorHandler(422, err.message));
+  }
+};
+
+exports.verfiySms = async (req, res, next) => {
+  // Validating User Inputs
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return next(new ErrorHandler(422, 'Invalid verification code'));
+  }
+
+  // Defining User Inputs
+  const { phone, smsToken } = req.body;
+
+  try {
+    const user = await authService.verifyLogin(phone, smsToken);
+
+    res.status(201).json({
+      userId: user.id,
+      phone: user.phone,
+      name: user.name,
+      email: user.email,
+      walletAddress: user.walletAddress,
+      session: await authService.generateJwt(user),
+      confirmed: user.confirmed,
+    });
+  } catch (err) {
+    next(new ErrorHandler(422, err.message));
+  }
+};
 
 exports.getUserDataForAdmin = async (userId) => {
   const queryRunner = new Query();
