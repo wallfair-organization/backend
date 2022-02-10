@@ -516,7 +516,11 @@ exports.searchUsers = async (limit, skip, search, sortField, sortOrder) => {
   }
 }
 
-exports.verifySms = async (phone, smsToken) => {
+exports.verifySms = async (user, phone, smsToken) => {
+  if (!user) {
+    throw new Error('Invalid user', 401);
+  }
+
   let verification;
 
   try {
@@ -530,6 +534,14 @@ exports.verifySms = async (phone, smsToken) => {
   if (!verification || verification.status !== 'approved') {
     throw new Error('Invalid verification code', 401);
   }
+  try {
+    user.phone = phone;
+    await user.save();
+  } catch (err) {
+    throw new Error('Unable to save user\n' + err, 401);
+
+  }
+
 };
 exports.sendSms = async (phone) => {
   //Cancel existing code if there's any.

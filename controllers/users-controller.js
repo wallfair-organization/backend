@@ -890,7 +890,7 @@ const verifySms = async (req, res, next) => {
     throw new Error('User not found, please try again', 422);
   }
   try {
-    await userService.verifySms(phone, smsToken);
+    await userService.verifySms(user, phone, smsToken);
 
     res.status(200).send();
   } catch (err) {
