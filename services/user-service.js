@@ -1,8 +1,6 @@
 const { User, UniversalEvent, ApiLogs } = require('@wallfair.io/wallfair-commons').models;
 const pick = require('lodash.pick');
 const bcrypt = require('bcrypt');
-const { ErrorHandler } = require('../util/error-handler');
-const { validationResult } = require('express-validator');
 const axios = require('axios');
 const { Wallet, fromWei, Query, AccountNamespace, BN, Transactions } = require('@wallfair.io/trading-engine');
 const { WFAIR_REWARDS } = require('../util/constants');
