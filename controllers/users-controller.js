@@ -912,7 +912,7 @@ const sendSms = async (req, res, next) => {
     await userService.sendSms(phone);
     res.status(200).send();
   } catch (err) {
-    next(new ErrorHandler(422, err.message));
+    next(new ErrorHandler(422, 'Unable to send SMS'));
   }
 };
 
