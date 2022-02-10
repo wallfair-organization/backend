@@ -15,10 +15,10 @@ const _ = require('lodash');
 const mongoose = require("mongoose");
 const { NotFoundError } = require('../util/error-handler')
 const { CasinoTradeContract } = require('@wallfair.io/wallfair-casino');
-const authService = require('../services/auth-service');
 const WFAIR = new Wallet();
 const casinoContract = new CasinoTradeContract();
 const CURRENCIES = ['WFAIR', 'EUR', 'USD'];
+const twilio = require('twilio')(process.env.TWILIO_ACC_SID, process.env.TWILIO_AUTH_TOKEN);
 
 exports.getUserByPhone = async (phone, session) => User.findOne({ phone }).session(session);
 exports.getUserByEmail = async (email) => User.findOne({ email });
@@ -516,54 +516,37 @@ exports.searchUsers = async (limit, skip, search, sortField, sortOrder) => {
   }
 }
 
-exports.login = async (req, res, next) => {
-  // Validating User Inputs
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return next(new ErrorHandler(422, 'Invalid phone number'));
-  }
-
-  // Defining User Inputs
-  const { phone, ref } = req.body;
+exports.verifySms = async (phone, smsToken) => {
+  let verification;
 
   try {
-    const response = await authService.doLogin(phone, ref);
-    res.status(201).json({
-      phone,
-      smsStatus: response.status,
-      existing: !!response.existing,
-    });
+    verification = await twilio.verify
+      .services(process.env.TWILIO_SID)
+      .verificationChecks.create({ to: phone, code: smsToken });
   } catch (err) {
-    console.error(err);
-    next(new ErrorHandler(422, err.message));
+    throw new Error('Invalid verification code', 401);
+  }
+
+  if (!verification || verification.status !== 'approved') {
+    throw new Error('Invalid verification code', 401);
   }
 };
-
-exports.verfiySms = async (req, res, next) => {
-  // Validating User Inputs
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return next(new ErrorHandler(422, 'Invalid verification code'));
-  }
-
-  // Defining User Inputs
-  const { phone, smsToken } = req.body;
-
+exports.sendSms = async (phone) => {
   try {
-    const user = await authService.verifyLogin(phone, smsToken);
+    await twilio.verify.services(process.env.TWILIO_SID)
+      .verifications(phone)
+      .update({ status: 'canceled' })
+      .then(verification => console.log(verification.status));
 
-    res.status(201).json({
-      userId: user.id,
-      phone: user.phone,
-      name: user.name,
-      email: user.email,
-      walletAddress: user.walletAddress,
-      session: await authService.generateJwt(user),
-      confirmed: user.confirmed,
-    });
+    await twilio.verify.services(process.env.TWILIO_SID)
+      .verifications
+      .create({ to: phone, channel: 'sms' })
+      .then(verification => console.log(verification.sid));
+
   } catch (err) {
-    next(new ErrorHandler(422, err.message));
+    throw new Error('Unable to send SMS\n' + err, 401);
   }
+  return;
 };
 
 exports.getUserDataForAdmin = async (userId) => {
