@@ -529,7 +529,7 @@ exports.verifySms = async (user, phone, smsToken) => {
     throw new Error('Invalid verification code', 401);
   }
 
-  if (!verification || verification.status !== 'approved') {
+  if (verification?.status !== 'approved') {
     throw new Error('Invalid verification code', 401);
   }
   try {
@@ -549,6 +549,7 @@ exports.sendSms = async (phone) => {
       .update({ status: 'canceled' })
   } catch (err) {
     //Do nothing if no previous code existed
+    console.log('No previous valid sms code, nothing to cancel.')
   }
   try {
     await twilio.verify.services(process.env.TWILIO_SID)
@@ -557,7 +558,6 @@ exports.sendSms = async (phone) => {
   } catch (err) {
     throw new Error('Unable to send SMS\n' + err, 401);
   }
-  return;
 };
 
 exports.getUserDataForAdmin = async (userId) => {

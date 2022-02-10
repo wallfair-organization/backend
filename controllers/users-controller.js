@@ -895,7 +895,7 @@ const verifySms = async (req, res, next) => {
     res.status(200).send();
   } catch (err) {
     console.log(err);
-    next(new ErrorHandler(422, err.message));
+    next(new ErrorHandler(422, 'Invalid verification code'));
   }
 };
 
