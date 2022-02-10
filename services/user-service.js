@@ -519,19 +519,18 @@ exports.verifySms = async (user, phone, smsToken) => {
     throw new Error('Invalid user', 401);
   }
 
-  let verification;
-
   try {
-    verification = await twilio.verify
+    const verification = await twilio.verify
       .services(process.env.TWILIO_SID)
       .verificationChecks.create({ to: phone, code: smsToken });
+    if (verification?.status !== 'approved') {
+      throw new Error('Invalid verification code', 401);
+    }
   } catch (err) {
     throw new Error('Invalid verification code', 401);
   }
 
-  if (verification?.status !== 'approved') {
-    throw new Error('Invalid verification code', 401);
-  }
+
   try {
     user.phone = phone;
     await user.save();
