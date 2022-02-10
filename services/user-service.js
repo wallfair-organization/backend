@@ -532,17 +532,18 @@ exports.verifySms = async (phone, smsToken) => {
   }
 };
 exports.sendSms = async (phone) => {
+  //Cancel existing code if there's any.
   try {
     await twilio.verify.services(process.env.TWILIO_SID)
       .verifications(phone)
       .update({ status: 'canceled' })
-      .then(verification => console.log(verification.status));
-
+  } catch (err) {
+    //Do nothing if no previous code existed
+  }
+  try {
     await twilio.verify.services(process.env.TWILIO_SID)
       .verifications
       .create({ to: phone, channel: 'sms' })
-      .then(verification => console.log(verification.sid));
-
   } catch (err) {
     throw new Error('Unable to send SMS\n' + err, 401);
   }
