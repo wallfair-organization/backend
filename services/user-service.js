@@ -114,16 +114,6 @@ exports.createUser = async (user) => {
     });
 };
 
-exports.payoutUser = async (/*userId, bet*/) => {
-  // const betId = bet.id;
-  const LOG_TAG = '[PAYOUT-BET]';
-  // console.debug(LOG_TAG, 'Payed out Bet', betId, userId);
-
-  console.debug(LOG_TAG, 'Requesting Bet Payout');
-  // const betContract = new BetContract(betId, bet.outcomes.length);
-  // await betContract.getPayout(userId);
-};
-
 exports.getBalanceOf = async (userId) => {
   return fromWei(await WFAIR.getBalance(userId)).toFixed(4);
 };
@@ -548,13 +538,14 @@ exports.sendSms = async (phone) => {
       .update({ status: 'canceled' })
   } catch (err) {
     //Do nothing if no previous code existed
-    console.log('No previous valid sms code, nothing to cancel.')
+    console.log('No previous valid sms code, nothing to cancel.', err.message);
   }
   try {
     await twilio.verify.services(process.env.TWILIO_SID)
       .verifications
       .create({ to: phone, channel: 'sms' })
   } catch (err) {
+    console.error('Failed to send sms', err.message);
     throw new Error('Unable to send SMS\n' + err, 401);
   }
 };
