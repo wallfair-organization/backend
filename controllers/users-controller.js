@@ -654,10 +654,7 @@ const claimPromoCode = async (req, res, next) => {
     return res.status(200).send(response);
   } catch (e) {
     console.error('PROMO CODES ERROR: ', e.message);
-    const msg = e.message === 'PROMO_CODE_ACTIVE' ?
-      'You first need to cancel the active bonus' :
-      `Failed to claim promo code ${req.body.promoCode}`;
-    return next(new ErrorHandler(500, msg));
+    return next(new ErrorHandler(500, e.message));
   }
 };
 
@@ -670,6 +667,17 @@ const cancelPromoCode = async (req, res, next) => {
   } catch (e) {
     console.error('PROMO CODES CANCEL: ', e.message);
     return next(new ErrorHandler(500, 'Failed to cancel the promo code'));
+  }
+};
+
+const withdrawPromoCode = async (req, res, next) => {
+  try {
+    const { ref = PROMO_CODE_DEFAULT_REF, promoCode } = req.body;
+    await promoCodesService.withdraw(req.user.id, promoCode, ref);
+    return res.status(204).send();
+  } catch (e) {
+    console.error('PROMO CODES WITHDRAW: ', e.message);
+    return next(new ErrorHandler(500, e.message));
   }
 }; 
 
@@ -784,6 +792,7 @@ exports.banUser = banUser;
 exports.generateMoonpayUrl = generateMoonpayUrl;
 exports.getUserPromoCodes = getUserPromoCodes;
 exports.claimPromoCode = claimPromoCode;
+exports.withdrawPromoCode = withdrawPromoCode;
 exports.cancelPromoCode = cancelPromoCode;
 exports.verifySms = verifySms;
 exports.sendSms = sendSms;
