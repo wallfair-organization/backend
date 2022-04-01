@@ -585,7 +585,13 @@ exports.getUserDataForAdmin = async (userId) => {
 
   const bets = await queryRunner
     .query(
-      `select cast(stakedamount / ${one} as integer) as "bet", crashfactor as "multiplier", cast(amountpaid/${one} as integer) as "cashout", cast((amountpaid - stakedamount) / ${one} as integer) as "profit", games.label from casino_trades left join games on games.id = casino_trades.gameid where userid = '${userId}' and state < 4 order by created_at;`);
+      `select cast(stakedamount / ${one} as integer) as "bet", crashfactor as "multiplier", 
+              cast(amountpaid/${one} as integer) as "cashout", 
+              cast((amountpaid - stakedamount) / ${one} as integer) as "profit", 
+              games.label 
+       from casino_trades left join games on games.id = casino_trades.gameid 
+       where userid = '${userId}' and state < 4 order by created_at;`
+    );
 
   const transactions = await new Transactions().getExternalTransactionLogs({
     select: ['created_at', 'amount', 'internal_user_id', 'originator', 'status', 'external_system'],
@@ -763,6 +769,11 @@ exports.processWeb3Login = async (address, username, ref, sid, cid) => {
     throw new Error('Failed to process web3 login');
   }
 };
+
+exports.getUserByAddress = async (address) => {
+  const userAccount = await new Account().getUserLink(address);
+  return userAccount ? await userApi.getOne(userAccount.user_id) : {};
+}
 
 exports.confirmDeposit = async (hash, networkCode, userId) => {
   try {
