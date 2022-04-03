@@ -159,6 +159,7 @@ exports.createPromoCode = async (req, res, next) => {
   const {
     name,
     ref,
+    provider,
     type,
     value,
     count,
@@ -176,10 +177,10 @@ exports.createPromoCode = async (req, res, next) => {
   try {
     const queryRunner = new Query();
     const result = await queryRunner.query(
-      `INSERT INTO promo_code(name, ref_id, type, value, count, description, expires_at, cover_url, wagering, duration) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+      `INSERT INTO promo_code(name, ref_id, type, value, count, description, expires_at, cover_url, wagering, duration, provider)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
-      [name, ref || PROMO_CODE_DEFAULT_REF, type, toWei(value).toString(), count || 1, description, expiresAt, coverUrl, wagering, duration]
+      [name, ref || PROMO_CODE_DEFAULT_REF, type, toWei(value).toString(), count || 1, description, expiresAt, coverUrl, wagering, duration, provider]
     );
     return res.status(201).send(result[0]);
   } catch (e) {
@@ -190,7 +191,10 @@ exports.createPromoCode = async (req, res, next) => {
 
 exports.getPromoCodes = async (req, res, next) => {
   try {
-    const result = await new Query().query(`SELECT * FROM promo_code`);
+    const { order = 'created_at', name } = req.query;
+    const result = await new Query().query(
+      `SELECT * FROM promo_code ${name ? 'WHERE name = ' + name : ''} ORDER BY ${order} DESC`
+    );
     return res.status(200)
       .send(result.map((r) => {
         return {
