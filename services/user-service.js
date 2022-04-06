@@ -374,17 +374,6 @@ exports.increaseAmountWon = async (userId, amount) => {
   }
 };
 
-exports.updateStatus = async (userId, status) => {
-  let user = await User.findById(userId);
-
-  if (user) {
-    user.status = status;
-    await user.save();
-  } else {
-    throw new Error('User does not exist');
-  }
-};
-
 /***
  * create USER_AWARD event in universalevents, add proper token amount based on `awardData.award` amount
  * @param userId
@@ -602,7 +591,26 @@ exports.getUserDataForAdmin = async (userId) => {
       created_at: 'DESC'
     }
   });
-  const apiLogs = await ApiLogs.find({ userId }, ['ip', 'createdAt', 'api_type', 'path', 'statusCode', 'headers'], { limit: 100, sort: { createdAt: -1 } });
+
+  const apiLogs = await ApiLogs.find({ userId }, ['ip', 'createdAt', 'api_type', 'path', 'statusCode', 'headers'], { limit: 500, sort: { createdAt: -1 } });
+  const userIps = [...new Set(apiLogs.map(item => item.ip))];
+  const usersOnSameIps = await ApiLogs.aggregate([
+    {
+      $match: {
+        ip: {
+          $in: userIps
+        },
+        userId: { $exists: true, $ne: userId }
+      }
+    }, {
+      $group: {
+        _id: '$userId',
+        ip: { $first: '$ip' }
+      }
+    }
+  ]).catch((err) => {
+    console.error(err);
+  });
 
   const bonus = await casinoContract.getPromoCodeUserByType(userId, 'BONUS');
 
@@ -624,6 +632,8 @@ exports.getUserDataForAdmin = async (userId) => {
       }
     }),
     apiLogs,
+    userIps,
+    usersOnSameIps
   }
 }
 
