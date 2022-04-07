@@ -600,14 +600,14 @@ const banUser = async (req, res, next) => {
   }
 
   const bannedUserId = req.params.userId;
-  const { duration, description } = req.body;
+  const { description, reactivateOn } = req.body;
 
   if (req.user.id === bannedUserId) {
     return next(new ErrorHandler(400, 'You cannot ban yourself'));
   }
 
   try {
-    const bannedUser = await userService.updateBanDeadline(bannedUserId, +duration, description);
+    const bannedUser = await userService.updateBanDeadline(bannedUserId, reactivateOn, description);
     return res.status(200).send(getBanData(bannedUser));
   } catch (e) {
     console.error(e.message);
@@ -648,7 +648,11 @@ const getUserPromoCodes = async (req, res, next) => {
 };
 
 const claimPromoCode = async (req, res, next) => {
-  try {
+  if (!req.user.phone) {
+    return next(new ErrorHandler(403, 'Missing phone number verification'));
+  }
+
+  try {    
     const response = await promoCodesService.claimPromoCodeBonus(req.user.id, req.body.promoCode);
     console.log(
       `User ${req.user.id} successfully claimed promo code ${req.body.promoCode}.`
@@ -695,11 +699,11 @@ const verifySms = async (req, res, next) => {
 
   const user = await userService.getUserById(userId);
   if (!user) {
-    throw new Error('User not found, please try again', 422);
+    return next(new ErrorHandler(422, 'User not found, please try again'));
   }
+
   try {
     await userService.verifySms(user, phone, smsToken);
-
     res.status(200).send();
   } catch (err) {
     console.log(err);

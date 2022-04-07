@@ -450,19 +450,14 @@ exports.checkAwardExist = async (userId, type) => {
  * @param {number} duration
  * @returns {Promise<User>}
  */
-exports.updateBanDeadline = async (userId, duration = 0, description = null) => {
-  if (!userId) {
-    throw new Error(`Invalid ban data supllied: userId - ${userId}, duration - ${duration}`);
-  }
+exports.updateBanDeadline = async (userId, reactivateOn, description = null) => {
   const user = await User.findById(userId);
   if (!user) {
     throw new Error(`No user found with ID '${userId}'`);
   }
-  const now = Date.now();
-  user.status = duration === 0 ? 'active' : 'banned';
-  user.reactivateOn = duration === 0 ? null : new Date(now + duration);
+  user.reactivateOn = reactivateOn;
   user.statusDescription = description;
-  return user.save();
+  return await user.save();
 };
 
 exports.changeUserRole = async (userId, role) => {
@@ -523,10 +518,6 @@ exports.searchUsers = async (limit, skip, search, sortField, sortOrder, account)
 }
 
 exports.verifySms = async (user, phone, smsToken) => {
-  if (!user) {
-    throw new Error('Invalid user', 401);
-  }
-
   try {
     const verification = await twilio.verify
       .services(process.env.TWILIO_SID)
@@ -538,15 +529,12 @@ exports.verifySms = async (user, phone, smsToken) => {
     throw new Error('Invalid verification code', 401);
   }
 
-
   try {
     user.phone = phone;
     await user.save();
   } catch (err) {
     throw new Error('Unable to save user\n' + err, 401);
-
   }
-
 };
 exports.sendSms = async (phone) => {
   //Cancel existing code if there's any.
@@ -583,8 +571,12 @@ exports.getUserDataForAdmin = async (userId) => {
       `select cast(stakedamount / ${one} as integer) as "bet", crashfactor as "multiplier", 
               cast(amountpaid/${one} as integer) as "cashout", 
               cast((amountpaid - stakedamount) / ${one} as integer) as "profit", 
-              games.label 
-       from casino_trades left join games on games.id = casino_trades.gameid 
+              concat(games1.label, games2.label, external_games_config.game_data -> 'title') as label,
+              created_at
+       from casino_trades 
+        left join games as games1 on games1.id = casino_trades.gameid
+        left join games as games2 on games2.label = casino_trades.gameid 
+        left join external_games_config on external_games_config.game_id = casino_trades.gameid
        where userid = '${userId}' and state < 4 order by created_at;`
     );
 
