@@ -150,6 +150,20 @@ exports.listUsers = async (req, res, next) => {
   }
 }
 
+exports.listUsersWithReferrals = async (req, res, next) => {
+  if (!req.user) {
+    return next(new ErrorHandler(403, 'Not authorized'));
+  }
+
+  try {
+    const data = await userService.usersWithReferrals();
+    return res.send(data);
+  } catch (e) {
+    console.error(e)
+    return next(new ErrorHandler(500));
+  }
+}
+
 exports.createPromoCode = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -167,7 +181,8 @@ exports.createPromoCode = async (req, res, next) => {
     coverUrl,
     wagering,
     duration,
-    expiresAt
+    expiresAt,
+    available,
   } = req.body;
 
   if (type === PROMO_CODES_TYPES.FREESPIN && ref === PROMO_CODE_DEFAULT_REF) {
@@ -177,10 +192,11 @@ exports.createPromoCode = async (req, res, next) => {
   try {
     const queryRunner = new Query();
     const result = await queryRunner.query(
-      `INSERT INTO promo_code(name, ref_id, type, value, count, description, expires_at, cover_url, wagering, duration, provider)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO promo_code(name, ref_id, type, value, count, description, expires_at, cover_url, wagering, duration, provider, available)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
-      [name, ref || PROMO_CODE_DEFAULT_REF, type, toWei(value).toString(), count || 1, description, expiresAt, coverUrl, wagering, duration, provider]
+      [name, ref || PROMO_CODE_DEFAULT_REF, type, toWei(value).toString(), count || 1,
+        description, expiresAt, coverUrl, wagering, duration, provider, available]
     );
     return res.status(201).send(result[0]);
   } catch (e) {
@@ -193,7 +209,7 @@ exports.getPromoCodes = async (req, res, next) => {
   try {
     const { order = 'created_at', name } = req.query;
     const result = await new Query().query(
-      `SELECT * FROM promo_code ${name ? 'WHERE name = ' + name : ''} ORDER BY ${order} DESC`
+      `SELECT promo_code.*, (SELECT COUNT(*) FROM promo_code_user WHERE promo_code_user.promo_code_id = promo_code.id) AS claims FROM promo_code ${name ? 'WHERE name = ' + name : ''} ORDER BY ${order} DESC`
     );
     return res.status(200)
       .send(result.map((r) => {
